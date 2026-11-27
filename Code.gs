@@ -21,7 +21,7 @@
  * Każdy zmienia swoje imię i hasło. Konta innych osób (dodawanie, hasło, wyłączanie, usuwanie,
  * nadawanie administratora) zmienia tylko administrator. Pierwsze konto jest administratorem.
  */
-const VER = '5';
+const VER = '6';
 const MAX_FAILS_NAME = 8, MAX_FAILS_ALL = 40, LOCK_MIN = 10;
 const STATUSES = ['Nowe', 'W trakcie', 'Zrobione'];
 const PROPS = PropertiesService.getScriptProperties();
@@ -87,6 +87,7 @@ function route(b) {
       case 'deleteUser': return deleteUser(b, me);
       case 'savePP': return savePP(b, me);
       case 'deletePP': return deletePP(b, me);
+      case 'importPPs': return importPPs(b, me);
     }
     throw new Error('Nieznana akcja — odśwież aplikację');
   });
@@ -248,7 +249,7 @@ function sync(b, me) {
     users: read('users').map(pubUser),
     tasks: tasks.map(pubTask),
     items: read('items').filter(i => ids[i.task]).map(pubItem),
-    pps: read('pps').map(p => ({ id: p.id, pp: String(p.pp), desc: String(p.desc || ''), by: String(p.by || '') })),
+    pps: read('pps').map(pubPP),
     photos: photos, comments: comments, hidden: hidden,
     magazyn: !!PROPS.getProperty('MAGAZYN_ID')
   };
@@ -517,8 +518,10 @@ function addComment(b, me) {
 
 /* ---------- lista numerów PP ---------- */
 
+function pubPP(p) { return { id: p.id, pp: String(p.pp), desc: String(p.desc || ''), by: String(p.by || '') }; }
+
 function savePP(b, me) {
-  const pp = clean(b.pp, 40), desc = clean(b.desc, 80);
+  const pp = clean(b.pp, 40), desc = clean(b.desc, 150);
   if (!pp) throw new Error('Wpisz numer PP');
   const all = read('pps');
   const o = b.id ? all.find(x => x.id === String(b.id)) : all.find(x => norm(x.pp) === norm(pp));
@@ -526,11 +529,31 @@ function savePP(b, me) {
     if (all.some(x => x.id !== o.id && norm(x.pp) === norm(pp))) throw new Error('PP ' + pp + ' już jest na liście');
     o.pp = pp; if (b.desc !== undefined) o.desc = desc;
     write('pps', o);
-    return { ok: true, pp: { id: o.id, pp: String(o.pp), desc: String(o.desc || ''), by: String(o.by || '') } };
+    return { ok: true, pp: pubPP(o) };
   }
   const n = { id: uid('n'), pp: pp, desc: desc, by: String(me.name), created: new Date() };
   append('pps', n);
   return { ok: true, pp: { id: n.id, pp: pp, desc: desc, by: n.by } };
+}
+
+// wklejona lista (np. z Excela): nowe numery dopisuje, istniejącym uzupełnia opis
+function importPPs(b, me) {
+  const lines = (b.lines || []).slice(0, 3000);
+  const s = sheet('pps'), all = read('pps'), by = {};
+  all.forEach(o => by[norm(o.pp)] = o);
+  let updated = 0;
+  const fresh = [];
+  lines.forEach(l => {
+    const pp = clean(l.pp, 40), desc = clean(l.desc, 150);
+    if (!pp) return;
+    const o = by[norm(pp)];
+    if (o) { if (desc && String(o.desc || '') !== desc) { o.desc = desc; o._dirty = true; updated++; } return; }
+    const n = { id: uid('n'), pp: pp, desc: desc, by: String(me.name), created: new Date() };
+    by[norm(pp)] = n; fresh.push(n);
+  });
+  all.filter(o => o._dirty).forEach(o => write('pps', o));
+  if (fresh.length) s.getRange(s.getLastRow() + 1, 1, fresh.length, T.pps.f.length).setValues(fresh.map(o => rowOf('pps', o)));
+  return { ok: true, added: fresh.length, updated: updated, pps: read('pps').map(pubPP) };
 }
 
 function deletePP(b, me) {
