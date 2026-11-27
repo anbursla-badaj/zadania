@@ -49,7 +49,7 @@ try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paintTh
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "7";
+const APP_VER = "8";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -203,6 +203,12 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .usr .nm small{display:block;font-weight:500;font-size:13px;color:var(--muted)}
 .usr.off .nm{opacity:.5}
 .loginbox{max-width:420px;margin:40px auto 0}
+.sug{position:fixed;z-index:60;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:240px;overflow:auto;padding:4px}
+.sug button{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-radius:6px;color:var(--fg);font:600 16px var(--body);padding:10px 12px;cursor:pointer}
+.sug button small{font:500 12px var(--body);color:var(--muted);white-space:nowrap}
+.sug button span{white-space:nowrap}
+.sug button:hover,.sug button.on{background:var(--soft)}
+.sug .hd{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 12px 4px}
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
 .sw{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;padding:0;text-align:left;font:600 14px var(--body)}
 .sw[aria-pressed="true"]{border-color:var(--fg);box-shadow:0 0 0 2px var(--accent)}
@@ -316,7 +322,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
           <label class="field"><span class="label">Przypisz do</span><select id="fWho"></select></label>
           <div class="row">
             <label class="field" style="flex:1"><span class="label">Termin</span><input id="fDue" type="date"></label>
-            <label class="field" style="flex:1"><span class="label">Numer PP</span><input id="fPP" maxlength="40" inputmode="numeric" placeholder="np. 1468"></label>
+            <label class="field" style="flex:1"><span class="label">Numer PP</span><input id="fPP" maxlength="40" inputmode="numeric" autocomplete="off" data-ppsug placeholder="np. 1468"></label>
           </div>
           <label class="row"><input type="checkbox" id="fUrgent"> <span>Pilne</span></label>
           <div class="msg" id="fMsg" hidden></div>
@@ -392,6 +398,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
   <div class="vbar"><span id="vInfo"></span><span id="vDelBox"></span><button class="btn" id="vClose">Zamknij</button></div>
 </div>
 
+<div class="sug" id="sug" hidden></div>
 <div class="toast" id="toast" hidden></div>
 <div class="upd" id="upd" hidden><span>Jest nowa wersja aplikacji</span><button class="btn" onclick="location.reload()">Odśwież</button></div>
 
@@ -600,7 +607,7 @@ function renderItems(){const t=curTask();if(!t)return;
 function itemRow(i,t){
   if(itemEdit===i.id){if(i.type==="mag")return`<div class="ied" data-id="${esc(i.id)}"><b>${esc(prodName(i.code)||i.text)}</b>
       <div class="row"><label class="field" style="flex:1"><span class="label">Ilość</span><input data-e="qty" type="number" min="1" inputmode="numeric" value="${i.qty}"></label>
-      <label class="field" style="flex:1"><span class="label">PP (puste = z zadania)</span><input data-e="pp" maxlength="40" inputmode="numeric" value="${esc(i.pp)}" placeholder="${esc(t.pp||"")}"></label></div>
+      <label class="field" style="flex:1"><span class="label">PP (puste = z zadania)</span><input data-e="pp" maxlength="40" inputmode="numeric" autocomplete="off" data-ppsug value="${esc(i.pp)}" placeholder="${esc(t.pp||"")}"></label></div>
       <div class="row"><button class="btn primary" data-esave>Zapisz</button><button class="btn" data-ecancel>Anuluj</button></div></div>`;
     return`<div class="ied" data-id="${esc(i.id)}"><input data-e="text" maxlength="300" value="${esc(i.text)}">
       <div class="row"><button class="btn primary" data-esave>Zapisz</button><button class="btn" data-ecancel>Anuluj</button></div></div>`}
@@ -715,7 +722,7 @@ function renderPick(){const box=$("#pickList");
   const q=$("#pickQ").value.trim().toLowerCase();
   const l=mag.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q));
   box.innerHTML=l.length?l.map(p=>{const st=mag.stock[p.code]||0;return`<div class="pr"><button data-prod="${esc(p.code)}"><span>${esc(p.name)}</span><small>stan ${fmtQ(st)}</small></button>
-    ${pickOpen===p.code?`<div class="add"><input type="number" min="1" inputmode="numeric" value="1" data-q aria-label="Ilość"><input maxlength="40" inputmode="numeric" data-pp placeholder="PP: ${esc((curTask()||{}).pp||"z zadania")}" aria-label="Numer PP"><button class="btn primary" data-addp="${esc(p.code)}">Dodaj</button></div>`:""}</div>`}).join("")
+    ${pickOpen===p.code?`<div class="add"><input type="number" min="1" inputmode="numeric" value="1" data-q aria-label="Ilość"><input maxlength="40" inputmode="numeric" autocomplete="off" data-ppsug data-pp placeholder="PP: ${esc((curTask()||{}).pp||"z zadania")}" aria-label="Numer PP"><button class="btn primary" data-addp="${esc(p.code)}">Dodaj</button></div>`:""}</div>`}).join("")
     :'<div class="empty">Nic nie znaleziono.</div>';
   const qi=box.querySelector("[data-q]");if(qi){qi.focus();qi.select()}}
 $("#pickList").onclick=async e=>{
@@ -784,6 +791,36 @@ async function onScan(code){const t=curTask();if(!t)return;scanBusy=true;if(navi
           catch(e){scanMsg(esc(e.message),"err")}res()}})}
     else scanMsg(mag.connected?`Nieznany kod: ${esc(code)}`:"Ładuję listę produktów — zeskanuj jeszcze raz",mag.connected?"err":"")}
   finally{scanBusy=false;lastAt=performance.now()}}
+
+/* ---------- podpowiedzi numerów PP ---------- */
+// wcześniej użyte numery PP (z zadań i pozycji), najnowsze na górze
+function ppList(){const m=new Map(),open=new Map();
+  const add=(pp,ts)=>{pp=String(pp||"").trim();if(!pp)return;if(!m.has(pp)||m.get(pp)<ts)m.set(pp,ts||"")};
+  tasks.forEach(t=>{add(t.pp,t.updated||t.created);if(t.pp&&t.status!=="Zrobione")open.set(t.pp,(open.get(t.pp)||0)+1)});
+  items.forEach(i=>add(i.pp,i.doneAt));
+  return[...m.entries()].sort((a,b)=>b[1].localeCompare(a[1])).map(([pp])=>({pp,open:open.get(pp)||0}))}
+let sugFor=null,sugIdx=-1;
+function sugShow(inp){const q=inp.value.trim().toLowerCase(),all=ppList();
+  let l=q?all.filter(x=>x.pp.toLowerCase().includes(q)):all;l=l.slice(0,q?20:8);
+  if(!l.length||(l.length===1&&l[0].pp.toLowerCase()===q)){sugHide();return}
+  sugFor=inp;sugIdx=-1;const box=$("#sug");
+  box.innerHTML=(q?"":'<div class="hd">Ostatnio używane PP</div>')+l.map(x=>`<button type="button" data-sugpp="${esc(x.pp)}"><span>PP ${esc(x.pp)}</span>${x.open?`<small>${x.open} ${x.open===1?"otwarte zadanie":x.open<5?"otwarte zadania":"otwartych zadań"}</small>`:""}</button>`).join("");
+  box.hidden=false;sugPlace()}
+function sugPlace(){if(!sugFor||$("#sug").hidden)return;const r=sugFor.getBoundingClientRect(),box=$("#sug");
+  const w=Math.min(innerWidth-16,Math.max(r.width,260));box.style.width=w+"px";box.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+"px";
+  const below=innerHeight-r.bottom;if(below<200&&r.top>below){box.style.top="";box.style.bottom=(innerHeight-r.top+4)+"px"}else{box.style.bottom="";box.style.top=(r.bottom+4)+"px"}}
+function sugHide(){$("#sug").hidden=true;sugFor=null;sugIdx=-1}
+function sugPick(pp){const inp=sugFor;if(!inp)return;inp.value=pp;sugHide();inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus()}
+document.addEventListener("focusin",e=>{if(e.target.matches&&e.target.matches("[data-ppsug]"))sugShow(e.target)});
+document.addEventListener("input",e=>{if(e.target.matches&&e.target.matches("[data-ppsug]")&&e.isTrusted)sugShow(e.target)});
+document.addEventListener("focusout",e=>{if(e.target===sugFor)setTimeout(()=>{if(document.activeElement!==sugFor)sugHide()},150)});
+document.addEventListener("keydown",e=>{if(!sugFor||$("#sug").hidden||e.target!==sugFor)return;const b=[...$("#sug").querySelectorAll("[data-sugpp]")];
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();sugIdx=(sugIdx+(e.key==="ArrowDown"?1:-1)+b.length)%b.length;b.forEach((x,i)=>x.classList.toggle("on",i===sugIdx));b[sugIdx].scrollIntoView({block:"nearest"})}
+  else if(e.key==="Enter"&&sugIdx>=0){e.preventDefault();e.stopPropagation();sugPick(b[sugIdx].dataset.sugpp)}
+  else if(e.key==="Escape"){e.stopPropagation();sugHide()}},true);
+$("#sug").addEventListener("mousedown",e=>e.preventDefault());  // klik w listę nie zabiera kursora z pola
+$("#sug").addEventListener("click",e=>{const b=e.target.closest("[data-sugpp]");if(b)sugPick(b.dataset.sugpp)});
+addEventListener("resize",sugPlace);addEventListener("scroll",sugPlace,true);
 
 /* ---------- ustawienia ---------- */
 let theme=ls.get("zad_theme")||"auto",color=THEMES[ls.get("zad_color")]?ls.get("zad_color"):"magazyn";
