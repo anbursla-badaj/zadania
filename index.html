@@ -49,7 +49,7 @@ try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paintTh
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "10";
+const APP_VER = "11";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -850,7 +850,7 @@ function sugPlace(){if(!sugFor||$("#sug").hidden)return;const r=sugFor.getBoundi
   const below=innerHeight-r.bottom;if(below<200&&r.top>below){box.style.top="";box.style.bottom=(innerHeight-r.top+4)+"px"}else{box.style.bottom="";box.style.top=(r.bottom+4)+"px"}}
 function sugHide(){$("#sug").hidden=true;sugFor=null;sugIdx=-1}
 function sugPick(pp,inp){inp=inp||sugFor;if(!inp)return;sugHide();
-  if(inp.id==="fName"){const f=$("#fPP");f.value=pp;inp.value=`PP ${pp} – `;inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);return}
+  if(inp.id==="fName"){const f=$("#fPP");f.value=pp;inp.value=ppHead(pp);inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);return}
   inp.value=pp;inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus()}
 const isSugInput=t=>t&&t.matches&&t.matches("[data-ppsug],[data-ppsug-title]");
 document.addEventListener("focusin",e=>{if(isSugInput(e.target))sugShow(e.target)});
@@ -867,10 +867,15 @@ $("#sug").addEventListener("click",async e=>{const inp=sugFor;
   const b=e.target.closest("[data-sugpp]");if(b)sugPick(b.dataset.sugpp,inp)});
 addEventListener("resize",sugPlace);addEventListener("scroll",sugPlace,true);
 
-/* numer PP w tytule zadania: „PP 1468 – reszta tytułu” */
-const PP_RE=/^\s*PP\s*[^\s–-]*\s*[–-]\s*/i;
+/* numer PP w tytule zadania: „PP 1468 Kraków – reszta tytułu” (miejscowość z opisu PP na liście) */
+const PP_RE=/^\s*PP\s*[0-9][0-9a-z\/-]*(?:\s+[^\s–]+){0,4}?\s*(?:–|-(?=\s|$))\s*/i;
 const stripPP=t=>t.replace(PP_RE,"");
-function syncTitlePP(){if(!$("#fPPinTitle").checked)return;const pp=$("#fPP").value.trim();if(pp&&!isPPnum(pp))return;const rest=stripPP($("#fName").value);$("#fName").value=pp?`PP ${pp} – ${rest}`:rest}
+// „Łódź, Piotrkowska 10” → „Łódź”; „ul. Długa 5, Kraków” → „Kraków”; sam adres bez miejscowości → nic
+function ppTown(pp){const x=pps.find(p=>fold(p.pp)===fold(pp));if(!x||!x.desc)return"";
+  const part=String(x.desc).split(/\s*[,;]\s*|\s+[–-]\s+/).map(v=>v.replace(/–/g,"-").trim()).find(v=>v&&!/\d/.test(v)&&!/^(ul|al|os|pl|ulica|aleja|osiedle|plac)\b\.?/i.test(v));
+  return part&&part.split(/\s+/).length<=4?part.slice(0,40):""}
+const ppHead=pp=>{const t=ppTown(pp);return`PP ${pp}${t?" "+t:""} – `};
+function syncTitlePP(){if(!$("#fPPinTitle").checked)return;const pp=$("#fPP").value.trim();if(pp&&!isPPnum(pp))return;const rest=stripPP($("#fName").value);$("#fName").value=pp?ppHead(pp)+rest:rest}
 $("#fPP").addEventListener("input",syncTitlePP);
 $("#fPPinTitle").onchange=e=>{ls.set("zad_pptitle",e.target.checked?"1":"0");if(e.target.checked)syncTitlePP();else $("#fName").value=stripPP($("#fName").value)};
 
