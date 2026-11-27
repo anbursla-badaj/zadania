@@ -1,7 +1,7 @@
 // Service worker: szybkie uruchamianie i ekran bez sieci.
 // Dane zawsze idą do Google (Apps Script), więc do zapisu potrzebny jest internet.
 // Numer musi być taki sam jak APP_VER w index.html
-const CACHE = "zadania-v4";
+const CACHE = "zadania-v5";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./jsQR.js"];
 
 self.addEventListener("install", e => {

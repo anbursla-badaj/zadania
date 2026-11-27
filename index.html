@@ -4,7 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1b1e1c">
-<script>try{const t=localStorage.getItem("zad_theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>
+/* Motywy kolorystyczne: l = jasny, d = ciemny. Wybór zapisuje się na tym urządzeniu. */
+const BASE_L={ok:"#2e7d32",err:"#b3261e"},BASE_D={ok:"#5cbf7d",err:"#f2877f"};
+const THEMES={
+  magazyn:{n:"Magazyn",l:{bg:"#f3f4f1",surface:"#ffffff",fg:"#1b1e1c",muted:"#5f6660",line:"#d9dcd6",soft:"#eceee8",accent:"#f2b705","accent-ink":"#1b1e1c","head-bg":"#1b1e1c","head-fg":"#f3f4f1","head-accent":"#f5c22b"},
+    d:{bg:"#141615",surface:"#1e211f",fg:"#eceee9",muted:"#9aa29b",line:"#323732",soft:"#262a27",accent:"#f5c22b","accent-ink":"#141615","head-bg":"#0e100f","head-fg":"#eceee9","head-accent":"#f5c22b"}},
+  ocean:{n:"Ocean",l:{bg:"#eef3f8",surface:"#ffffff",fg:"#102033",muted:"#52657a",line:"#d3dde8",soft:"#e3ebf4",accent:"#1f7ae0","accent-ink":"#ffffff","head-bg":"#0f2740","head-fg":"#eef3f8","head-accent":"#5aa9ff"},
+    d:{bg:"#0d1620",surface:"#142231",fg:"#e6eef7",muted:"#93a6ba",line:"#24364a",soft:"#1b2b3d",accent:"#4c9bf0","accent-ink":"#071320","head-bg":"#081321","head-fg":"#e6eef7","head-accent":"#5aa9ff"}},
+  las:{n:"Las",l:{bg:"#f1f5ef",surface:"#ffffff",fg:"#15241a",muted:"#56685b",line:"#d5dfd3",soft:"#e5ede2",accent:"#2f8f6f","accent-ink":"#ffffff","head-bg":"#173322","head-fg":"#eef5ee","head-accent":"#8fd9a8"},
+    d:{bg:"#0f1611",surface:"#17221a",fg:"#e5efe7",muted:"#92a698",line:"#26362a",soft:"#1d2b21",accent:"#4fbf95","accent-ink":"#06140e","head-bg":"#0a140d","head-fg":"#e5efe7","head-accent":"#8fd9a8"}},
+  malina:{n:"Malina",l:{bg:"#faf1f4",surface:"#ffffff",fg:"#2a1219",muted:"#74555f",line:"#ecd5dc",soft:"#f4e4ea",accent:"#d6336c","accent-ink":"#ffffff","head-bg":"#3a1220","head-fg":"#fbeff3","head-accent":"#ff8fb4"},
+    d:{bg:"#1a0f13",surface:"#24151b",fg:"#f6e6ec",muted:"#b495a1",line:"#3b2630",soft:"#2e1c24",accent:"#f06595","accent-ink":"#1a0810","head-bg":"#12090c","head-fg":"#f6e6ec","head-accent":"#ff8fb4"}},
+  fiolet:{n:"Fiolet",l:{bg:"#f4f2fa",surface:"#ffffff",fg:"#1d1630",muted:"#61597a",line:"#dcd7ea",soft:"#ebe7f6",accent:"#7048e8","accent-ink":"#ffffff","head-bg":"#231a3d","head-fg":"#f3f0fb","head-accent":"#b9a3ff"},
+    d:{bg:"#13101c",surface:"#1c1828",fg:"#ece8f7",muted:"#a29bbb",line:"#2f2942",soft:"#241f33",accent:"#9775fa","accent-ink":"#120c24","head-bg":"#0c0a13","head-fg":"#ece8f7","head-accent":"#b9a3ff"}},
+  pomarancza:{n:"Pomarańcza",l:{bg:"#faf4ee",surface:"#ffffff",fg:"#2a1a0e",muted:"#75604f",line:"#ecdccd",soft:"#f4e9de",accent:"#e8590c","accent-ink":"#ffffff","head-bg":"#33200f","head-fg":"#fbf3ec","head-accent":"#ffa94d"},
+    d:{bg:"#18110b",surface:"#231912",fg:"#f6ece3",muted:"#b5a08d",line:"#3b2c20",soft:"#2d2118",accent:"#ff922b","accent-ink":"#1a0e03","head-bg":"#100a05","head-fg":"#f6ece3","head-accent":"#ffa94d"}},
+  grafit:{n:"Grafit",l:{bg:"#f4f4f4",surface:"#ffffff",fg:"#111111",muted:"#555555",line:"#d4d4d4",soft:"#ebebeb",accent:"#111111","accent-ink":"#ffffff","head-bg":"#000000","head-fg":"#ffffff","head-accent":"#ffffff"},
+    d:{bg:"#0b0b0b",surface:"#161616",fg:"#f2f2f2",muted:"#a3a3a3",line:"#2e2e2e",soft:"#1f1f1f",accent:"#f2f2f2","accent-ink":"#0b0b0b","head-bg":"#000000","head-fg":"#ffffff","head-accent":"#ffffff"}}
+};
+function themeVars(c,dark){const t=THEMES[c]||THEMES.magazyn;return Object.assign({},dark?BASE_D:BASE_L,dark?t.d:t.l)}
+function paintTheme(){let c="magazyn",m="auto";try{c=localStorage.getItem("zad_color")||c;m=localStorage.getItem("zad_theme")||m}catch(e){}
+  const dark=m==="dark"||(m!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches),v=themeVars(c,dark),s=document.documentElement.style;
+  for(const k in v)s.setProperty("--"+k,v[k]);s.colorScheme=dark?"dark":"light";
+  const mt=document.querySelector('meta[name="theme-color"]');if(mt)mt.content=v["head-bg"]}
+paintTheme();
+try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paintTheme)}catch(e){}
+</script>
 <title>Zadania</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -13,7 +39,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "4";
+const APP_VER = "5";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -22,27 +48,25 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIOND
 :root{
   --bg:#f3f4f1;--surface:#fff;--fg:#1b1e1c;--muted:#5f6660;--line:#d9dcd6;
   --accent:#f2b705;--accent-ink:#1b1e1c;--err:#b3261e;--ok:#2e7d32;--soft:#eceee8;
+  --head-bg:#1b1e1c;--head-fg:#f3f4f1;--head-accent:#f5c22b;
   --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141615;--surface:#1e211f;--fg:#eceee9;--muted:#9aa29b;--line:#323732;--accent:#f5c22b;--accent-ink:#141615;--err:#f2877f;--ok:#5cbf7d;--soft:#262a27;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#141615;--surface:#1e211f;--fg:#eceee9;--muted:#9aa29b;--line:#323732;--accent:#f5c22b;--accent-ink:#141615;--err:#f2877f;--ok:#5cbf7d;--soft:#262a27;color-scheme:dark}
-:root[data-theme="light"]{color-scheme:light}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.45}
 .wrap{max-width:680px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-header{position:sticky;top:0;z-index:5;background:#1b1e1c;color:#f3f4f1}
+header{position:sticky;top:0;z-index:5;background:var(--head-bg);color:var(--head-fg)}
 header .wrap{padding-block:12px 0;display:flex;flex-direction:column;gap:8px}
 .brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 h1{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:.02em;margin:0;text-transform:uppercase}
-h1 span{color:#f5c22b}
+h1 span{color:var(--head-accent)}
 .who{font-size:14px;opacity:.85;background:none;border:0;color:inherit;font-family:inherit;cursor:pointer;text-decoration:underline dotted;padding:4px 0}
 nav{display:flex;gap:4px}
 nav button{flex:1;background:none;border:0;color:inherit;opacity:.7;font:600 14px var(--body);padding:10px 0 12px;border-bottom:3px solid transparent;cursor:pointer}
-nav button[aria-selected="true"]{opacity:1;border-color:#f5c22b}
+nav button[aria-selected="true"]{opacity:1;border-color:var(--head-accent)}
 nav button b{font-family:var(--mono);font-size:12px;font-weight:500;background:rgba(255,255,255,.14);border-radius:99px;padding:1px 7px;margin-left:6px}
 main{padding-bottom:48px}
 h2{font-family:var(--display);font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:.03em;margin:26px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -138,7 +162,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .pr .add input{width:auto;flex:1;min-width:90px}
 .scanview{position:fixed;inset:0;z-index:30;background:#000;color:#fff;display:flex;flex-direction:column}
 .scanview video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.aim{--c:#f5c22b;position:absolute;left:50%;top:45%;width:min(68vw,60vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:10px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);
+.aim{--c:var(--head-accent);position:absolute;left:50%;top:45%;width:min(68vw,60vh);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:10px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);
   background:linear-gradient(var(--c),var(--c)) 0 0/44px 5px,linear-gradient(var(--c),var(--c)) 0 0/5px 44px,linear-gradient(var(--c),var(--c)) 100% 0/44px 5px,linear-gradient(var(--c),var(--c)) 100% 0/5px 44px,
   linear-gradient(var(--c),var(--c)) 0 100%/44px 5px,linear-gradient(var(--c),var(--c)) 0 100%/5px 44px,linear-gradient(var(--c),var(--c)) 100% 100%/44px 5px,linear-gradient(var(--c),var(--c)) 100% 100%/5px 44px;background-repeat:no-repeat}
 .aim.lock{--c:#3ddc84}
@@ -148,7 +172,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .scanres.ok{background:rgba(46,125,50,.85)}
 .scanres.err{background:rgba(179,38,30,.85)}
 .scanbot .btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.25);color:#fff;padding:14px;font-size:17px;flex:1}
-.scanbot .btn.accent{background:#f5c22b;color:#1b1e1c;border-color:#f5c22b}
+.scanbot .btn.accent{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .viewer{position:fixed;inset:0;z-index:28;background:rgba(0,0,0,.92);display:flex;flex-direction:column;color:#fff}
 .viewer .imgbox{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:12px}
 .viewer img{max-width:100%;max-height:100%;object-fit:contain}
@@ -166,6 +190,13 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .usr .nm small{display:block;font-weight:500;font-size:13px;color:var(--muted)}
 .usr.off .nm{opacity:.5}
 .loginbox{max-width:420px;margin:40px auto 0}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.sw{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;padding:0;text-align:left;font:600 14px var(--body)}
+.sw[aria-pressed="true"]{border-color:var(--fg);box-shadow:0 0 0 2px var(--accent)}
+.sw .top{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.03em}
+.sw .top i{width:16px;height:4px;border-radius:2px}
+.sw .bot{display:flex;gap:6px;padding:9px 10px}
+.sw .bot b{width:20px;height:20px;border-radius:50%}
 .pw{position:relative;display:flex}
 .pw input{padding-right:48px}
 .pw .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:20px;cursor:pointer;padding:6px 8px;opacity:.55}
@@ -294,6 +325,9 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
           <button class="btn" id="sPinSave">Zapisz nowe hasło</button>
           <div class="label">Wygląd</div>
           <div class="seg" id="sTheme"><button data-th="auto">Auto</button><button data-th="light">Jasny</button><button data-th="dark">Ciemny</button></div>
+          <div class="label">Motyw kolorystyczny</div>
+          <div class="swatches" id="sColors"></div>
+          <div class="note">Wygląd zapisuje się na tym urządzeniu.</div>
           <button class="btn danger" id="sLogout">Wyloguj z tego urządzenia</button>
         </div>
         <div id="sBoss" hidden>
@@ -738,11 +772,17 @@ async function onScan(code){const t=curTask();if(!t)return;scanBusy=true;if(navi
   finally{scanBusy=false;lastAt=performance.now()}}
 
 /* ---------- ustawienia ---------- */
-let theme=ls.get("zad_theme")||"auto";
-function applyTheme(){const r=document.documentElement;theme==="auto"?delete r.dataset.theme:r.dataset.theme=theme;ls.set("zad_theme",theme);
-  document.querySelectorAll("#sTheme button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.th===theme))}
+let theme=ls.get("zad_theme")||"auto",color=THEMES[ls.get("zad_color")]?ls.get("zad_color"):"magazyn";
+function applyTheme(){ls.set("zad_theme",theme);ls.set("zad_color",color);paintTheme();
+  document.querySelectorAll("#sTheme button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.th===theme));
+  const dark=theme==="dark"||(theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  $("#sColors").innerHTML=Object.entries(THEMES).map(([id,t])=>{const v=themeVars(id,dark);
+    return`<button class="sw" data-color="${id}" aria-pressed="${id===color}" style="background:${v.bg};color:${v.fg}">
+      <span class="top" style="background:${v["head-bg"]};color:${v["head-fg"]}">${esc(t.n)}<i style="background:${v["head-accent"]}"></i></span>
+      <span class="bot"><b style="background:${v.accent}"></b><b style="background:${v.surface};border:1px solid ${v.line}"></b><b style="background:${v.ok}"></b></span></button>`}).join("")}
 applyTheme();
 $("#sTheme").onclick=e=>{const b=e.target.closest("[data-th]");if(b){theme=b.dataset.th;applyTheme()}};
+$("#sColors").onclick=e=>{const b=e.target.closest("[data-color]");if(b){color=b.dataset.color;applyTheme()}};
 let userEdit=null,userDel=null;
 function renderSettings(){$("#sVer").textContent=APP_VER;const adm=isAdmin();
   $("#sMe").innerHTML=`Zalogowany: <b>${esc(me.name)}</b>${adm?" · administrator":""}`;
