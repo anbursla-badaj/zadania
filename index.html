@@ -26,7 +26,7 @@ const THEMES={
 /* Tła: zdjęcia z Unsplash (licencja Unsplash — darmowe do użytku). veil = jak mocno tło jest przykryte kolorem motywu */
 const BGS={magazyn:"photo-1707568774879-49bcd6421a00",ocean:"photo-1634017839464-5c339ebe3cb4",las:"photo-1677611998429-1baa4371456b",
   malina:"photo-1764513168327-309c566fbc36",fiolet:"photo-1690321607729-bce901c77324",pomarancza:"photo-1749680287741-243118ed6b2c",grafit:"photo-1558591710-4b4a1ae0f04d"};
-const VEIL={magazyn:{l:.86,d:.5},ocean:{l:.8,d:.72},las:{l:.86,d:.5},malina:{l:.45,d:.86},fiolet:{l:.86,d:.45},pomarancza:{l:.86,d:.5},grafit:{l:.35,d:.88}};
+const VEIL={magazyn:{l:.8,d:.62},ocean:{l:.8,d:.72},las:{l:.8,d:.5},malina:{l:.45,d:.76},fiolet:{l:.78,d:.45},pomarancza:{l:.82,d:.58},grafit:{l:.35,d:.88}};
 const bgUrl=(c,w)=>BGS[c]?`https://images.unsplash.com/${BGS[c]}?auto=format&fit=crop&w=${w}&q=55`:"";
 function hexA(x,a){const n=parseInt(x.slice(1),16);return`rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}
 function themeVars(c,dark){const t=THEMES[c]||THEMES.magazyn;return Object.assign({},dark?BASE_D:BASE_L,dark?t.d:t.l)}
@@ -49,7 +49,7 @@ try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paintTh
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "6";
+const APP_VER = "7";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
