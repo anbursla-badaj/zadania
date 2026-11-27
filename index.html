@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "3";
+const APP_VER = "4";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -166,6 +166,9 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .usr .nm small{display:block;font-weight:500;font-size:13px;color:var(--muted)}
 .usr.off .nm{opacity:.5}
 .loginbox{max-width:420px;margin:40px auto 0}
+.pw{position:relative;display:flex}
+.pw input{padding-right:48px}
+.pw .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:20px;cursor:pointer;padding:6px 8px;opacity:.55}
 .spin{display:inline-block;width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
 /* Komputer: lista po lewej, zadanie po prawej */
@@ -200,8 +203,8 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
       <div class="note" id="lNote"></div>
       <div class="msg" id="lMsg" hidden></div>
       <label class="field"><span class="label">Imię</span><input id="lName" autocomplete="username" maxlength="40"></label>
-      <label class="field"><span class="label">PIN</span><input id="lPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></label>
-      <label class="field" id="lPin2Box" hidden><span class="label">Powtórz PIN</span><input id="lPin2" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></label>
+      <div class="field"><span class="label">Hasło</span><div class="pw"><input id="lPin" type="password" autocomplete="current-password" maxlength="64"><button type="button" class="eye" data-eye aria-label="Pokaż hasło">👁</button></div></div>
+      <div class="field" id="lPin2Box" hidden><span class="label">Powtórz hasło</span><div class="pw"><input id="lPin2" type="password" autocomplete="new-password" maxlength="64"><button type="button" class="eye" data-eye aria-label="Pokaż hasło">👁</button></div></div>
       <button class="btn primary big" id="lGo">Zaloguj</button>
     </div>
   </section>
@@ -285,9 +288,10 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
           <div id="sMe"></div>
           <div class="label">Zmień imię</div>
           <div class="row"><input id="sName" maxlength="40"><button class="btn" id="sNameSave">Zapisz</button></div>
-          <div class="label">Zmień PIN</div>
-          <div class="row"><input id="sPin1" type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN"><input id="sPin2" type="password" inputmode="numeric" maxlength="8" placeholder="Powtórz"></div>
-          <button class="btn" id="sPinSave">Zapisz nowy PIN</button>
+          <div class="label">Zmień hasło</div>
+          <div class="pw"><input id="sPin1" type="password" autocomplete="new-password" maxlength="64" placeholder="Nowe hasło (min. 6 znaków)"><button type="button" class="eye" data-eye aria-label="Pokaż hasło">👁</button></div>
+          <div class="pw"><input id="sPin2" type="password" autocomplete="new-password" maxlength="64" placeholder="Powtórz nowe hasło"><button type="button" class="eye" data-eye aria-label="Pokaż hasło">👁</button></div>
+          <button class="btn" id="sPinSave">Zapisz nowe hasło</button>
           <div class="label">Wygląd</div>
           <div class="seg" id="sTheme"><button data-th="auto">Auto</button><button data-th="light">Jasny</button><button data-th="dark">Ciemny</button></div>
           <button class="btn danger" id="sLogout">Wyloguj z tego urządzenia</button>
@@ -300,10 +304,10 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
             <div id="sAddBox" class="field">
               <div class="label">Dodaj osobę</div>
               <input id="uName" maxlength="40" placeholder="Imię">
-              <input id="uPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN startowy (4–8 cyfr)">
+              <div class="pw"><input id="uPin" type="password" autocomplete="new-password" maxlength="64" placeholder="Hasło startowe (min. 6 znaków)"><button type="button" class="eye" data-eye aria-label="Pokaż hasło">👁</button></div>
               <label class="row"><input type="checkbox" id="uAdmin"> <span>Administrator</span></label>
               <button class="btn primary" id="uAdd">Dodaj osobę</button>
-              <div class="note">Imię i PIN przekaż tej osobie — PIN i imię może potem zmienić sama w ustawieniach.</div>
+              <div class="note">Imię i hasło przekaż tej osobie — hasło i imię może potem zmienić sama w ustawieniach.</div>
             </div>
           </div>
         </div>
@@ -358,6 +362,9 @@ function when(s){if(!s)return"";const d=s.slice(0,10),t=s.slice(11,16),y=new Dat
   const yd=y.getFullYear()+"-"+pad2(y.getMonth()+1)+"-"+pad2(y.getDate());
   return d===today()?"dziś "+t:d===yd?"wczoraj "+t:s.slice(8,10)+"."+s.slice(5,7)+" "+t}
 const fmtQ=n=>Number(n).toLocaleString("pl-PL");
+const pwBad=p=>p.length<6?"Hasło musi mieć co najmniej 6 znaków":p.length>64?"Hasło może mieć najwyżej 64 znaki":"";
+document.addEventListener("click",e=>{const b=e.target.closest("[data-eye]");if(!b)return;const i=b.parentElement.querySelector("input");
+  const show=i.type==="password";i.type=show?"text":"password";b.setAttribute("aria-label",show?"Ukryj hasło":"Pokaż hasło");b.style.opacity=show?"1":".55";i.focus()});
 async function busy(btn,fn){if(btn.disabled)return;const h=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{return await fn()}finally{btn.disabled=false;btn.innerHTML=h}}
 
@@ -388,14 +395,14 @@ function showLogin(mode,msg){loginMode=mode;me=null;
   $("#bootView").hidden=true;$("#appView").hidden=true;$("#tabs").hidden=true;$("#who").hidden=true;$("#loginView").hidden=false;
   const first=mode==="first";
   $("#lTitle").textContent=first?"Pierwsze uruchomienie":"Logowanie";
-  $("#lNote").textContent=first?"Utwórz pierwsze konto (swoje) — będziesz administratorem. Potem w ustawieniach dodasz kolegów.":"Wpisz swoje imię i PIN. Telefon je zapamięta.";
+  $("#lNote").textContent=first?"Utwórz pierwsze konto (swoje) — będziesz administratorem. Potem w ustawieniach dodasz kolegów.":"Wpisz swoje imię i hasło. Telefon je zapamięta.";
   $("#lPin2Box").hidden=!first;$("#lGo").textContent=first?"Utwórz konto":"Zaloguj";
   $("#lMsg").hidden=!msg;$("#lMsg").textContent=msg||"";
   if(cred&&cred.u)$("#lName").value=cred.u;
   ($("#lName").value?$("#lPin"):$("#lName")).focus()}
-async function doLogin(){const name=$("#lName").value.trim(),pin=$("#lPin").value.trim(),err=t=>{$("#lMsg").textContent=t;$("#lMsg").hidden=false};
-  if(!name)return err("Wpisz imię");if(!/^\d{4,8}$/.test(pin))return err("PIN to 4–8 cyfr");
-  if(loginMode==="first"&&pin!==$("#lPin2").value.trim())return err("PIN-y się różnią");
+async function doLogin(){const name=$("#lName").value.trim(),pin=$("#lPin").value,err=t=>{$("#lMsg").textContent=t;$("#lMsg").hidden=false};
+  if(!name)return err("Wpisz imię");if(!pin)return err("Wpisz hasło");
+  if(loginMode==="first"){const bad=pwBad(pin);if(bad)return err(bad);if(pin!==$("#lPin2").value)return err("Hasła się różnią")}
   await busy($("#lGo"),async()=>{try{
     const j=loginMode==="first"?await api("firstAdmin",{name,pin},true):await api("login",{u:name,p:pin},true);
     cred={u:name,p:pin};ls.set("zad_cred",JSON.stringify(cred));$("#lPin").value="";$("#lPin2").value="";
@@ -742,9 +749,9 @@ function renderSettings(){$("#sVer").textContent=APP_VER;const adm=isAdmin();
   if(document.activeElement!==$("#sName"))$("#sName").value=me.name;
   $("#sBoss").hidden=false;$("#sAddBox").hidden=!adm;$("#sNoAdmin").hidden=adm;
   $("#sUsers").innerHTML=users.map(u=>{const self=u.id===me.id,ua=u.role==="Administrator";let acts="";
-    if(userEdit===u.id)acts=`<input data-np type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN" style="width:130px"><button class="btn sm primary" data-pinsave>Zapisz</button><button class="btn sm" data-cancel>Anuluj</button>`;
+    if(userEdit===u.id)acts=`<input data-np type="text" autocomplete="off" maxlength="64" placeholder="Nowe hasło" style="width:170px"><button class="btn sm primary" data-pinsave>Zapisz</button><button class="btn sm" data-cancel>Anuluj</button>`;
     else if(userDel===u.id)acts=`<span class="note" style="flex-basis:100%">Usunąć konto „${esc(u.name)}”? Zadania przypisane do tej osoby będą „dla wszystkich”.</span><button class="btn sm danger" data-delyes>Usuń konto</button><button class="btn sm" data-cancel>Anuluj</button>`;
-    else if(adm)acts=`<button class="btn sm" data-pin>PIN</button><button class="btn sm" data-adm>${ua?"Odbierz admina":"Nadaj admina"}</button>${self?"":`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button><button class="btn sm danger" data-del>Usuń</button>`}`;
+    else if(adm)acts=`<button class="btn sm" data-pin>Hasło</button><button class="btn sm" data-adm>${ua?"Odbierz admina":"Nadaj admina"}</button>${self?"":`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button><button class="btn sm danger" data-del>Usuń</button>`}`;
     return`<div class="usr${u.active?"":" off"}" data-u="${esc(u.id)}"><div class="nm">${esc(u.name)}<small>${ua?"administrator":"użytkownik"}${u.active?"":" · wyłączony"}${self?" · to Ty":""}</small></div>${acts}</div>`}).join("");
   const np=$("#sUsers [data-np]");if(np)np.focus()}
 $("#sUsers").onclick=async e=>{const row=e.target.closest("[data-u]");if(!row)return;const u=byId(users,row.dataset.u);const b=e.target.closest("button");if(!b||!u)return;
@@ -754,25 +761,25 @@ $("#sUsers").onclick=async e=>{const row=e.target.closest("[data-u]");if(!row)re
   if(b.matches("[data-delyes]"))return busy(b,async()=>{try{await api("deleteUser",{id:u.id});users=users.filter(x=>x.id!==u.id);
     tasks.forEach(t=>{if(t.assignee===u.id)t.assignee=""});userDel=null;renderSettings();renderList();toast("Usunięto konto: "+u.name)}catch(er){toast(er.message,true)}});
   let p=null;
-  if(b.matches("[data-pinsave]")){const v=row.querySelector("[data-np]").value.trim();if(!/^\d{4,8}$/.test(v))return toast("PIN to 4–8 cyfr",true);p={id:u.id,pin:v}}
+  if(b.matches("[data-pinsave]")){const v=row.querySelector("[data-np]").value;const bad=pwBad(v);if(bad)return toast(bad,true);p={id:u.id,pin:v}}
   if(b.matches("[data-adm]"))p={id:u.id,admin:u.role!=="Administrator"};
   if(b.matches("[data-act]"))p={id:u.id,active:!u.active};
   if(!p)return;
   await busy(b,async()=>{try{const j=await api("updateUser",p);Object.assign(u,j.user);userEdit=null;
     if(u.id===me.id)me.role=u.role;if(p.pin&&u.id===me.id){cred.p=p.pin;ls.set("zad_cred",JSON.stringify(cred))}
-    renderSettings();toast(p.pin?(u.id===me.id?"Zmieniono PIN":"Zmieniono PIN — przekaż go tej osobie"):"Zapisano")}catch(er){toast(er.message,true)}})};
+    renderSettings();toast(p.pin?(u.id===me.id?"Zmieniono hasło":"Zmieniono hasło — przekaż je tej osobie"):"Zapisano")}catch(er){toast(er.message,true)}})};
 $("#sNameSave").onclick=()=>busy($("#sNameSave"),async()=>{const v=$("#sName").value.trim();if(!v)return toast("Wpisz imię",true);if(v===me.name)return;
   try{const j=await api("updateUser",{id:me.id,name:v});me.name=j.user.name;const u=byId(users,me.id);if(u)u.name=j.user.name;
     cred.u=j.user.name;ls.set("zad_cred",JSON.stringify(cred));$("#who").textContent=me.name+" ⚙";$("#sName").blur();renderSettings();renderList();
     toast("Zmieniono imię — loguj się teraz jako „"+me.name+"”")}catch(e){toast(e.message,true)}});
 $("#sName").onkeydown=e=>{if(e.key==="Enter")$("#sNameSave").click()};
-$("#uAdd").onclick=()=>busy($("#uAdd"),async()=>{const name=$("#uName").value.trim(),pin=$("#uPin").value.trim();
-  if(!name)return toast("Wpisz imię",true);if(!/^\d{4,8}$/.test(pin))return toast("PIN to 4–8 cyfr",true);
+$("#uAdd").onclick=()=>busy($("#uAdd"),async()=>{const name=$("#uName").value.trim(),pin=$("#uPin").value;
+  if(!name)return toast("Wpisz imię",true);const bad=pwBad(pin);if(bad)return toast(bad,true);
   try{const j=await api("addUser",{name,pin,admin:$("#uAdmin").checked});users.push(j.user);$("#uName").value="";$("#uPin").value="";$("#uAdmin").checked=false;renderSettings();toast("Dodano: "+j.user.name)}
   catch(e){toast(e.message,true)}});
 $("#sPinSave").onclick=()=>busy($("#sPinSave"),async()=>{const a=$("#sPin1").value.trim(),b=$("#sPin2").value.trim();
-  if(!/^\d{4,8}$/.test(a))return toast("PIN to 4–8 cyfr",true);if(a!==b)return toast("PIN-y się różnią",true);
-  try{await api("changePin",{newPin:a});cred.p=a;ls.set("zad_cred",JSON.stringify(cred));$("#sPin1").value="";$("#sPin2").value="";toast("Zmieniono PIN")}catch(e){toast(e.message,true)}});
+  const bad=pwBad(a);if(bad)return toast(bad,true);if(a!==b)return toast("Hasła się różnią",true);
+  try{await api("changePin",{newPin:a});cred.p=a;ls.set("zad_cred",JSON.stringify(cred));$("#sPin1").value="";$("#sPin2").value="";toast("Zmieniono hasło")}catch(e){toast(e.message,true)}});
 $("#sLogout").onclick=()=>logout();
 
 /* ---------- start ---------- */

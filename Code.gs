@@ -2,7 +2,7 @@
  * Zadania — backend w Google Sheets (Apps Script).
  *
  * Arkusze tworzą się same przy pierwszym użyciu:
- *   Użytkownicy: ID | Imię | PIN (skrót, nie sam PIN) | Rola (Administrator / Użytkownik) | Aktywny | Utworzono
+ *   Użytkownicy: ID | Imię | Hasło (skrót, nie samo hasło) | Rola (Administrator / Użytkownik) | Aktywny | Utworzono
  *   Zadania:     ID | Nr | Tytuł | Opis | Status | Przypisane | Termin | Pilne | PP | Utworzył | Utworzono | Zmieniono | Zakończono
  *   Pozycje:     ID | Zadanie | Typ | Tekst | Kod | Ilość | PP | Zrobione | Kto | Kiedy | Wpis magazynu | Kolejność
  *   Zdjęcia:     ID | Zadanie | Plik | Rodzaj | Kto | Kiedy | Miniatura
@@ -17,16 +17,16 @@
  * Kod magazynQR nie jest zmieniany.
  *
  * Uprawnienia: zadania, pozycje, zdjęcia i komentarze może dodawać, zmieniać i usuwać każdy.
- * Każdy zmienia swoje imię i PIN. Konta innych osób (dodawanie, PIN, wyłączanie, usuwanie,
+ * Każdy zmienia swoje imię i hasło. Konta innych osób (dodawanie, hasło, wyłączanie, usuwanie,
  * nadawanie administratora) zmienia tylko administrator. Pierwsze konto jest administratorem.
  */
-const VER = '3';
+const VER = '4';
 const MAX_FAILS_NAME = 8, MAX_FAILS_ALL = 40, LOCK_MIN = 10;
 const STATUSES = ['Nowe', 'W trakcie', 'Zrobione'];
 const PROPS = PropertiesService.getScriptProperties();
 
 const T = {
-  users:    { name: 'Użytkownicy', head: ['ID', 'Imię', 'PIN', 'Rola', 'Aktywny', 'Utworzono'],
+  users:    { name: 'Użytkownicy', head: ['ID', 'Imię', 'Hasło', 'Rola', 'Aktywny', 'Utworzono'],
               f: ['id', 'name', 'pin', 'role', 'active', 'created'], text: [1, 2, 3] },
   tasks:    { name: 'Zadania', head: ['ID', 'Nr', 'Tytuł', 'Opis', 'Status', 'Przypisane', 'Termin', 'Pilne', 'PP', 'Utworzył', 'Utworzono', 'Zmieniono', 'Zakończono'],
               f: ['id', 'nr', 'title', 'desc', 'status', 'assignee', 'due', 'urgent', 'pp', 'by', 'created', 'updated', 'closed'], text: [1, 3, 4, 6, 7, 9] },
@@ -176,7 +176,9 @@ function hashPin(pin, userId) {
   return 'h' + d.map(x => ('0' + ((x + 256) % 256).toString(16)).slice(-2)).join('');
 }
 function checkPinFormat(pin) {
-  if (!/^\d{4,8}$/.test(String(pin || ''))) throw new Error('PIN to 4–8 cyfr');
+  const p = String(pin || '');
+  if (p.length < 6) throw new Error('Hasło musi mieć co najmniej 6 znaków');
+  if (p.length > 64) throw new Error('Hasło może mieć najwyżej 64 znaki');
 }
 
 function auth(b) {
@@ -191,7 +193,7 @@ function auth(b) {
   cache.put(key, String(fn), 600); cache.put('failsAll', String(fa), 600);
   if (fn >= MAX_FAILS_NAME) { cache.put('lock' + key, '1', LOCK_MIN * 60); cache.remove(key); }
   if (fa >= MAX_FAILS_ALL) { cache.put('lockAll', '1', 5 * 60); cache.remove('failsAll'); }
-  throw fail('Złe imię lub PIN', { auth: true });
+  throw fail('Złe imię lub hasło', { auth: true });
 }
 
 function firstAdmin(b) {
@@ -202,6 +204,7 @@ function firstAdmin(b) {
   const u = { id: uid('u'), name: name, role: 'Administrator', active: true, created: new Date() };
   u.pin = hashPin(String(b.pin), u.id);
   ensureAll();
+  sheet('users').getRange(1, 1, 1, T.users.head.length).setValues([T.users.head]);  // nagłówki w aktualnej wersji
   append('users', u);
   return { ok: true, me: pubUser(u) };
 }
