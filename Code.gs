@@ -7,6 +7,7 @@
  *   Pozycje:     ID | Zadanie | Typ | Tekst | Kod | Ilość | PP | Zrobione | Kto | Kiedy | Wpis magazynu | Kolejność
  *   Zdjęcia:     ID | Zadanie | Plik | Rodzaj | Kto | Kiedy | Miniatura
  *   Komentarze:  ID | Zadanie | Kto | Kiedy | Tekst | System
+ *   Numery PP:   ID | Numer | Opis | Dodał | Utworzono   (lista podpowiedzi PP, uzupełniana w aplikacji)
  *
  * Właściwości skryptu (Ustawienia projektu ⚙ → Właściwości skryptu):
  *   MAGAZYN_ID — ID arkusza magazynQR (fragment adresu między /d/ a /edit). Bez niego działa wszystko oprócz magazynu.
@@ -20,7 +21,7 @@
  * Każdy zmienia swoje imię i hasło. Konta innych osób (dodawanie, hasło, wyłączanie, usuwanie,
  * nadawanie administratora) zmienia tylko administrator. Pierwsze konto jest administratorem.
  */
-const VER = '4';
+const VER = '5';
 const MAX_FAILS_NAME = 8, MAX_FAILS_ALL = 40, LOCK_MIN = 10;
 const STATUSES = ['Nowe', 'W trakcie', 'Zrobione'];
 const PROPS = PropertiesService.getScriptProperties();
@@ -35,7 +36,9 @@ const T = {
   photos:   { name: 'Zdjęcia', head: ['ID', 'Zadanie', 'Plik', 'Rodzaj', 'Kto', 'Kiedy', 'Miniatura'],
               f: ['id', 'task', 'file', 'kind', 'by', 'at', 'thumb'], text: [1, 2, 3, 7] },
   comments: { name: 'Komentarze', head: ['ID', 'Zadanie', 'Kto', 'Kiedy', 'Tekst', 'System'],
-              f: ['id', 'task', 'by', 'at', 'text', 'sys'], text: [1, 2, 5] }
+              f: ['id', 'task', 'by', 'at', 'text', 'sys'], text: [1, 2, 5] },
+  pps:      { name: 'Numery PP', head: ['ID', 'Numer', 'Opis', 'Dodał', 'Utworzono'],
+              f: ['id', 'pp', 'desc', 'by', 'created'], text: [1, 2, 3] }
 };
 
 /* ---------- wejście ---------- */
@@ -82,6 +85,8 @@ function route(b) {
       case 'addUser': return addUser(b, me);
       case 'updateUser': return updateUser(b, me);
       case 'deleteUser': return deleteUser(b, me);
+      case 'savePP': return savePP(b, me);
+      case 'deletePP': return deletePP(b, me);
     }
     throw new Error('Nieznana akcja — odśwież aplikację');
   });
@@ -243,6 +248,7 @@ function sync(b, me) {
     users: read('users').map(pubUser),
     tasks: tasks.map(pubTask),
     items: read('items').filter(i => ids[i.task]).map(pubItem),
+    pps: read('pps').map(p => ({ id: p.id, pp: String(p.pp), desc: String(p.desc || ''), by: String(p.by || '') })),
     photos: photos, comments: comments, hidden: hidden,
     magazyn: !!PROPS.getProperty('MAGAZYN_ID')
   };
@@ -507,6 +513,30 @@ function addComment(b, me) {
   const o = { id: uid('k'), task: t.id, by: String(me.name), at: new Date(), text: text, sys: false };
   append('comments', o);
   return { ok: true, comment: { id: o.id, by: o.by, at: fmt(o.at), text: text, sys: false } };
+}
+
+/* ---------- lista numerów PP ---------- */
+
+function savePP(b, me) {
+  const pp = clean(b.pp, 40), desc = clean(b.desc, 80);
+  if (!pp) throw new Error('Wpisz numer PP');
+  const all = read('pps');
+  const o = b.id ? all.find(x => x.id === String(b.id)) : all.find(x => norm(x.pp) === norm(pp));
+  if (o) {
+    if (all.some(x => x.id !== o.id && norm(x.pp) === norm(pp))) throw new Error('PP ' + pp + ' już jest na liście');
+    o.pp = pp; if (b.desc !== undefined) o.desc = desc;
+    write('pps', o);
+    return { ok: true, pp: { id: o.id, pp: String(o.pp), desc: String(o.desc || ''), by: String(o.by || '') } };
+  }
+  const n = { id: uid('n'), pp: pp, desc: desc, by: String(me.name), created: new Date() };
+  append('pps', n);
+  return { ok: true, pp: { id: n.id, pp: pp, desc: desc, by: n.by } };
+}
+
+function deletePP(b, me) {
+  const o = find('pps', b.id);
+  removeRows('pps', [o]);
+  return { ok: true };
 }
 
 /* ---------- użytkownicy ---------- */

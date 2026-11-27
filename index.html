@@ -49,7 +49,7 @@ try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",paintTh
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "8";
+const APP_VER = "9";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -208,6 +208,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
 .sug button small{font:500 12px var(--body);color:var(--muted);white-space:nowrap}
 .sug button span{white-space:nowrap}
 .sug button:hover,.sug button.on{background:var(--soft)}
+.sug button.add{color:var(--accent);justify-content:flex-start}
 .sug .hd{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 12px 4px}
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
 .sw{display:flex;flex-direction:column;border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;padding:0;text-align:left;font:600 14px var(--body)}
@@ -317,14 +318,16 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
         <button class="btn ghost back" data-back>← Anuluj</button>
         <h2 id="fTitle">Nowe zadanie</h2>
         <div class="panel">
-          <label class="field"><span class="label">Tytuł *</span><input id="fName" maxlength="150" placeholder="Co trzeba zrobić?"></label>
+          <label class="field"><span class="label">Tytuł *</span><input id="fName" maxlength="150" autocomplete="off" data-ppsug-title placeholder="Co trzeba zrobić? (wpisz „PP”, żeby wybrać numer)"></label>
+          <div class="field"><span class="label">Numer PP</span>
+            <div class="row"><input id="fPP" maxlength="40" inputmode="numeric" autocomplete="off" data-ppsug placeholder="np. 1468" style="flex:1">
+              <label class="row" style="flex:none;gap:6px;white-space:nowrap"><input type="checkbox" id="fPPinTitle"> <span>w tytule</span></label></div></div>
           <label class="field"><span class="label">Opis</span><textarea id="fDesc" maxlength="4000" placeholder="Szczegóły, gdzie, jak…"></textarea></label>
           <label class="field"><span class="label">Przypisz do</span><select id="fWho"></select></label>
           <div class="row">
             <label class="field" style="flex:1"><span class="label">Termin</span><input id="fDue" type="date"></label>
-            <label class="field" style="flex:1"><span class="label">Numer PP</span><input id="fPP" maxlength="40" inputmode="numeric" autocomplete="off" data-ppsug placeholder="np. 1468"></label>
+            <label class="row" style="flex:1;align-self:flex-end;min-height:48px"><input type="checkbox" id="fUrgent"> <span>Pilne</span></label>
           </div>
-          <label class="row"><input type="checkbox" id="fUrgent"> <span>Pilne</span></label>
           <div class="msg" id="fMsg" hidden></div>
           <div class="row"><button class="btn primary big" id="fSave">Zapisz</button></div>
         </div>
@@ -349,6 +352,14 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
           <label class="row"><input type="checkbox" id="sBgImg"> <span>Tło z obrazkiem</span></label>
           <div class="note">Wygląd zapisuje się na tym urządzeniu. Obrazki tła: <a href="https://unsplash.com" target="_blank" rel="noopener" style="color:inherit">Unsplash</a> (darmowa licencja).</div>
           <button class="btn danger" id="sLogout">Wyloguj z tego urządzenia</button>
+        </div>
+        <h2>Lista numerów PP</h2>
+        <div class="panel">
+          <div class="users" id="sPPs"></div>
+          <div class="label">Dodaj numer PP</div>
+          <div class="row"><input id="ppNew" maxlength="40" inputmode="numeric" placeholder="Numer, np. 1468" style="flex:1"><input id="ppDesc" maxlength="80" placeholder="Opis (opcjonalnie)" style="flex:2"></div>
+          <button class="btn primary" id="ppAdd">Dodaj do listy</button>
+          <div class="note">Numery z listy podpowiadają się w polu PP i w tytule (wpisz „PP”). Listę widzą i uzupełniają wszyscy.</div>
         </div>
         <div id="sBoss" hidden>
           <h2>Osoby</h2>
@@ -425,7 +436,7 @@ async function busy(btn,fn){if(btn.disabled)return;const h=btn.innerHTML;btn.dis
 
 /* ---------- stan ---------- */
 let cred=null;try{cred=JSON.parse(ls.get("zad_cred")||"null")}catch{}
-let me=null,users=[],tasks=[],items=[],pCount={},cCount={},hidden=0,showAll=false,lastSync=0;
+let me=null,users=[],tasks=[],items=[],pps=[],pCount={},cCount={},hidden=0,showAll=false,lastSync=0;
 let mag={connected:false,products:[],sets:[],stock:{}},magAt=0,magOn=false;
 let tab=ls.get("zad_tab")||"mine",cur=null,side="",det={},pending=new Set();
 const byId=(l,id)=>l.find(x=>x.id===id);
@@ -478,7 +489,7 @@ async function startApp(){
 
 /* ---------- synchronizacja ---------- */
 async function sync(){const j=await api("sync",{all:showAll});
-  me=j.me;users=j.users;tasks=j.tasks;items=j.items;hidden=j.hidden||0;magOn=!!j.magazyn;lastSync=Date.now();
+  me=j.me;users=j.users;tasks=j.tasks;items=j.items;pps=j.pps||[];hidden=j.hidden||0;magOn=!!j.magazyn;lastSync=Date.now();
   const oldP=pCount,oldC=cCount;pCount=j.photos||{};cCount=j.comments||{};
   $("#who").textContent=me.name+" ⚙";
   renderList();
@@ -513,7 +524,7 @@ function renderList(){if(!me)return;
     return`<button class="card${t.urgent&&t.status!=="Zrobione"?" urgent":""}${t.id===cur&&side==="task"?" sel":""}" data-open="${esc(t.id)}">
       <div class="t1"><div class="title"><span class="nr">#${t.nr}</span>${esc(t.title)}</div><span class="chip s-${st}">${esc(t.status)}</span></div>
       <div class="meta">${t.urgent&&t.status!=="Zrobione"?'<span class="late">PILNE</span>':""}<span>👤 ${esc(uName(t.assignee)||"dla wszystkich")}</span>
-      ${t.due?`<span class="${late?"late":""}">📅 ${late?"po terminie · ":""}${fmtDay(t.due)}</span>`:""}${t.pp?`<span>PP ${esc(t.pp)}</span>`:""}
+      ${t.due?`<span class="${late?"late":""}">📅 ${late?"po terminie · ":""}${fmtDay(t.due)}</span>`:""}${t.pp&&!t.title.includes("PP "+t.pp)?`<span>PP ${esc(t.pp)}</span>`:""}
       ${n?`<span>☑ ${d}/${n}</span>`:""}${pCount[t.id]?`<span>📷 ${pCount[t.id]}</span>`:""}${cCount[t.id]?`<span>💬 ${cCount[t.id]}</span>`:""}
       ${tab==="done"&&t.closed?`<span>✓ ${when(t.closed)}</span>`:""}</div>
       ${n?`<div class="bar"><i style="width:${Math.round(d/n*100)}%"></i></div>`:""}</button>`}).join("")
@@ -548,7 +559,7 @@ function openForm(id){editing=id;const t=id?byId(tasks,id):null;
   $("#fTitle").textContent=t?`Edycja zadania #${t.nr}`:"Nowe zadanie";
   $("#fName").value=t?t.title:"";$("#fDesc").value=t?t.desc:"";$("#fDue").value=t?t.due:"";$("#fPP").value=t?t.pp:"";$("#fUrgent").checked=t?t.urgent:false;
   $("#fWho").innerHTML='<option value="">Dla wszystkich</option>'+users.filter(u=>u.active||(t&&u.id===t.assignee)).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("");
-  $("#fWho").value=t?t.assignee:"";$("#fMsg").hidden=true;
+  $("#fWho").value=t?t.assignee:"";$("#fMsg").hidden=true;$("#fPPinTitle").checked=ls.get("zad_pptitle")!=="0";
   showSide("form");$("#fName").focus()}
 $("#fSave").onclick=()=>busy($("#fSave"),async()=>{
   const task={id:editing||"",title:$("#fName").value,desc:$("#fDesc").value,assignee:$("#fWho").value,due:$("#fDue").value,pp:$("#fPP").value,urgent:$("#fUrgent").checked};
@@ -793,34 +804,72 @@ async function onScan(code){const t=curTask();if(!t)return;scanBusy=true;if(navi
   finally{scanBusy=false;lastAt=performance.now()}}
 
 /* ---------- podpowiedzi numerów PP ---------- */
-// wcześniej użyte numery PP (z zadań i pozycji), najnowsze na górze
-function ppList(){const m=new Map(),open=new Map();
-  const add=(pp,ts)=>{pp=String(pp||"").trim();if(!pp)return;if(!m.has(pp)||m.get(pp)<ts)m.set(pp,ts||"")};
-  tasks.forEach(t=>{add(t.pp,t.updated||t.created);if(t.pp&&t.status!=="Zrobione")open.set(t.pp,(open.get(t.pp)||0)+1)});
-  items.forEach(i=>add(i.pp,i.doneAt));
-  return[...m.entries()].sort((a,b)=>b[1].localeCompare(a[1])).map(([pp])=>({pp,open:open.get(pp)||0}))}
+// lista PP (dodawana ręcznie w ustawieniach lub z podpowiedzi) + ostatnio używane w zadaniach
+function ppData(){const open=new Map(),recent=new Map(),seen=(pp,ts)=>{if(!recent.has(pp)||recent.get(pp)<ts)recent.set(pp,ts||"")};
+  tasks.forEach(t=>{if(!t.pp)return;if(t.status!=="Zrobione")open.set(t.pp,(open.get(t.pp)||0)+1);seen(t.pp,t.updated||t.created)});
+  items.forEach(i=>{if(i.pp)seen(i.pp,i.doneAt)});
+  const inList=new Set(pps.map(p=>p.pp.toLowerCase()));
+  const list=[...pps].sort((a,b)=>(recent.get(b.pp)||"").localeCompare(recent.get(a.pp)||"")||a.pp.localeCompare(b.pp,"pl",{numeric:true}))
+    .map(p=>({pp:p.pp,desc:p.desc||"",open:open.get(p.pp)||0}));
+  const rec=[...recent.entries()].filter(([pp])=>!inList.has(pp.toLowerCase())).sort((a,b)=>b[1].localeCompare(a[1])).map(([pp])=>({pp,desc:"",open:open.get(pp)||0}));
+  return{list,rec}}
+const openTxt=n=>n?n+" "+(n===1?"otwarte zadanie":n<5?"otwarte zadania":"otwartych zadań"):"";
 let sugFor=null,sugIdx=-1;
-function sugShow(inp){const q=inp.value.trim().toLowerCase(),all=ppList();
-  let l=q?all.filter(x=>x.pp.toLowerCase().includes(q)):all;l=l.slice(0,q?20:8);
-  if(!l.length||(l.length===1&&l[0].pp.toLowerCase()===q)){sugHide();return}
+function sugShow(inp){const isTitle=inp.id==="fName";let raw;
+  if(isTitle){const m=inp.value.match(/^\s*pp\s*(\S*)$/i);if(!m){sugHide();return}raw=m[1]}else raw=inp.value.trim();
+  const q=raw.toLowerCase(),{list,rec}=ppData(),f=x=>!q||x.pp.toLowerCase().includes(q)||x.desc.toLowerCase().includes(q);
+  const L=list.filter(f).slice(0,q?30:10),R=rec.filter(f).slice(0,q?10:5);
+  const canAdd=!!q&&!list.some(x=>x.pp.toLowerCase()===q);
+  if(!L.length&&!R.length&&!canAdd){sugHide();return}
+  if(!isTitle&&!canAdd&&L.length+R.length===1&&(L[0]||R[0]).pp.toLowerCase()===q){sugHide();return}
   sugFor=inp;sugIdx=-1;const box=$("#sug");
-  box.innerHTML=(q?"":'<div class="hd">Ostatnio używane PP</div>')+l.map(x=>`<button type="button" data-sugpp="${esc(x.pp)}"><span>PP ${esc(x.pp)}</span>${x.open?`<small>${x.open} ${x.open===1?"otwarte zadanie":x.open<5?"otwarte zadania":"otwartych zadań"}</small>`:""}</button>`).join("");
+  const row=x=>`<button type="button" data-sugpp="${esc(x.pp)}"><span>PP ${esc(x.pp)}</span><small>${esc([x.desc,openTxt(x.open)].filter(Boolean).join(" · "))}</small></button>`;
+  box.innerHTML=(L.length?'<div class="hd">Lista PP</div>'+L.map(row).join(""):"")+(R.length?'<div class="hd">Ostatnio używane</div>'+R.map(row).join(""):"")
+    +(canAdd?`<button type="button" class="add" data-sugadd="${esc(raw)}"><span>+ Dodaj PP ${esc(raw)} do listy</span></button>`:"");
   box.hidden=false;sugPlace()}
 function sugPlace(){if(!sugFor||$("#sug").hidden)return;const r=sugFor.getBoundingClientRect(),box=$("#sug");
   const w=Math.min(innerWidth-16,Math.max(r.width,260));box.style.width=w+"px";box.style.left=Math.max(8,Math.min(r.left,innerWidth-w-8))+"px";
   const below=innerHeight-r.bottom;if(below<200&&r.top>below){box.style.top="";box.style.bottom=(innerHeight-r.top+4)+"px"}else{box.style.bottom="";box.style.top=(r.bottom+4)+"px"}}
 function sugHide(){$("#sug").hidden=true;sugFor=null;sugIdx=-1}
-function sugPick(pp){const inp=sugFor;if(!inp)return;inp.value=pp;sugHide();inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus()}
-document.addEventListener("focusin",e=>{if(e.target.matches&&e.target.matches("[data-ppsug]"))sugShow(e.target)});
-document.addEventListener("input",e=>{if(e.target.matches&&e.target.matches("[data-ppsug]")&&e.isTrusted)sugShow(e.target)});
+function sugPick(pp,inp){inp=inp||sugFor;if(!inp)return;sugHide();
+  if(inp.id==="fName"){const f=$("#fPP");f.value=pp;inp.value=`PP ${pp} – `;inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);return}
+  inp.value=pp;inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus()}
+const isSugInput=t=>t&&t.matches&&t.matches("[data-ppsug],[data-ppsug-title]");
+document.addEventListener("focusin",e=>{if(isSugInput(e.target))sugShow(e.target)});
+document.addEventListener("input",e=>{if(isSugInput(e.target)&&e.isTrusted)sugShow(e.target)});
 document.addEventListener("focusout",e=>{if(e.target===sugFor)setTimeout(()=>{if(document.activeElement!==sugFor)sugHide()},150)});
-document.addEventListener("keydown",e=>{if(!sugFor||$("#sug").hidden||e.target!==sugFor)return;const b=[...$("#sug").querySelectorAll("[data-sugpp]")];
+document.addEventListener("keydown",e=>{if(!sugFor||$("#sug").hidden||e.target!==sugFor)return;const b=[...$("#sug").querySelectorAll("button")];
   if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();sugIdx=(sugIdx+(e.key==="ArrowDown"?1:-1)+b.length)%b.length;b.forEach((x,i)=>x.classList.toggle("on",i===sugIdx));b[sugIdx].scrollIntoView({block:"nearest"})}
-  else if(e.key==="Enter"&&sugIdx>=0){e.preventDefault();e.stopPropagation();sugPick(b[sugIdx].dataset.sugpp)}
+  else if(e.key==="Enter"&&sugIdx>=0){e.preventDefault();e.stopPropagation();b[sugIdx].click()}
   else if(e.key==="Escape"){e.stopPropagation();sugHide()}},true);
 $("#sug").addEventListener("mousedown",e=>e.preventDefault());  // klik w listę nie zabiera kursora z pola
-$("#sug").addEventListener("click",e=>{const b=e.target.closest("[data-sugpp]");if(b)sugPick(b.dataset.sugpp)});
+$("#sug").addEventListener("click",async e=>{const inp=sugFor;
+  const a=e.target.closest("[data-sugadd]");
+  if(a){a.disabled=true;try{const j=await api("savePP",{pp:a.dataset.sugadd});if(!pps.some(x=>x.id===j.pp.id))pps.push(j.pp);toast("Dodano PP "+j.pp.pp+" do listy");sugPick(j.pp.pp,inp)}catch(er){a.disabled=false;toast(er.message,true)}return}
+  const b=e.target.closest("[data-sugpp]");if(b)sugPick(b.dataset.sugpp,inp)});
 addEventListener("resize",sugPlace);addEventListener("scroll",sugPlace,true);
+
+/* numer PP w tytule zadania: „PP 1468 – reszta tytułu” */
+const PP_RE=/^\s*PP\s*[^\s–-]*\s*[–-]\s*/i;
+const stripPP=t=>t.replace(PP_RE,"");
+function syncTitlePP(){if(!$("#fPPinTitle").checked)return;const pp=$("#fPP").value.trim(),rest=stripPP($("#fName").value);$("#fName").value=pp?`PP ${pp} – ${rest}`:rest}
+$("#fPP").addEventListener("input",syncTitlePP);
+$("#fPPinTitle").onchange=e=>{ls.set("zad_pptitle",e.target.checked?"1":"0");if(e.target.checked)syncTitlePP();else $("#fName").value=stripPP($("#fName").value)};
+
+/* lista PP w ustawieniach */
+let ppDel=null;
+function renderPPs(){const l=[...pps].sort((a,b)=>a.pp.localeCompare(b.pp,"pl",{numeric:true})),{list}=ppData(),openOf=pp=>(list.find(x=>x.pp===pp)||{}).open||0;
+  $("#sPPs").innerHTML=l.length?l.map(p=>`<div class="usr" data-ppid="${esc(p.id)}"><div class="nm">PP ${esc(p.pp)}<small>${esc([p.desc,openTxt(openOf(p.pp))].filter(Boolean).join(" · ")||"bez opisu")}</small></div>
+    ${ppDel===p.id?`<button class="btn sm danger" data-ppyes>Usuń z listy</button><button class="btn sm" data-ppno>Anuluj</button>`:`<button class="btn sm" data-ppdel aria-label="Usuń">✕</button>`}</div>`).join("")
+    :'<div class="note">Lista jest pusta. Dodaj numery PP, z którymi pracujecie — będą się podpowiadać przy tytule i polu PP.</div>'}
+$("#sPPs").onclick=async e=>{const row=e.target.closest("[data-ppid]");if(!row)return;const id=row.dataset.ppid,b=e.target.closest("button");if(!b)return;
+  if(b.matches("[data-ppdel]")){ppDel=id;return renderPPs()}
+  if(b.matches("[data-ppno]")){ppDel=null;return renderPPs()}
+  if(b.matches("[data-ppyes]"))busy(b,async()=>{try{await api("deletePP",{id});pps=pps.filter(x=>x.id!==id);ppDel=null;renderPPs()}catch(er){toast(er.message,true)}})};
+$("#ppAdd").onclick=()=>busy($("#ppAdd"),async()=>{const pp=$("#ppNew").value.trim(),desc=$("#ppDesc").value.trim();if(!pp)return toast("Wpisz numer PP",true);
+  try{const j=await api("savePP",{pp,desc});const k=pps.findIndex(x=>x.id===j.pp.id);if(k>=0)pps[k]=j.pp;else pps.push(j.pp);$("#ppNew").value="";$("#ppDesc").value="";renderPPs();toast("Zapisano PP "+j.pp.pp);$("#ppNew").focus()}
+  catch(er){toast(er.message,true)}});
+["#ppNew","#ppDesc"].forEach(s=>$(s).onkeydown=e=>{if(e.key==="Enter")$("#ppAdd").click()});
 
 /* ---------- ustawienia ---------- */
 let theme=ls.get("zad_theme")||"auto",color=THEMES[ls.get("zad_color")]?ls.get("zad_color"):"magazyn";
@@ -837,7 +886,7 @@ $("#sTheme").onclick=e=>{const b=e.target.closest("[data-th]");if(b){theme=b.dat
 $("#sColors").onclick=e=>{const b=e.target.closest("[data-color]");if(b){color=b.dataset.color;applyTheme()}};
 $("#sBgImg").onchange=e=>{ls.set("zad_bgimg",e.target.checked?"1":"0");applyTheme()};
 let userEdit=null,userDel=null;
-function renderSettings(){$("#sVer").textContent=APP_VER;const adm=isAdmin();
+function renderSettings(){$("#sVer").textContent=APP_VER;const adm=isAdmin();if(!ppDel&&!document.activeElement?.closest?.("#sPPs"))renderPPs();
   $("#sMe").innerHTML=`Zalogowany: <b>${esc(me.name)}</b>${adm?" · administrator":""}`;
   if(document.activeElement!==$("#sName"))$("#sName").value=me.name;
   $("#sBoss").hidden=false;$("#sAddBox").hidden=!adm;$("#sNoAdmin").hidden=adm;
