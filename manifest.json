@@ -1,0 +1,16 @@
+{
+  "name": "Zadania",
+  "short_name": "Zadania",
+  "description": "Zadania dla zespołu: lista rzeczy do zrobienia, zdjęcia, komentarze i wydania z magazynu",
+  "lang": "pl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b1e1c",
+  "theme_color": "#1b1e1c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
