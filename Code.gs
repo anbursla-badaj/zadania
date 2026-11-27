@@ -15,8 +15,10 @@
  * Integracja z magazynem: odhaczenie pozycji „z magazynu” dopisuje do arkusza magazynQR (Wpisy)
  * zwykłe „Wydanie” z Dokument = „Zadanie #Nr”. Odznaczenie usuwa ten wpis po jego ID.
  * Kod magazynQR nie jest zmieniany.
+ *
+ * Wszyscy użytkownicy mają takie same uprawnienia (zadania, usuwanie, dodawanie osób).
  */
-const VER = '1';
+const VER = '2';
 const MAX_FAILS_NAME = 8, MAX_FAILS_ALL = 40, LOCK_MIN = 10;
 const STATUSES = ['Nowe', 'W trakcie', 'Zrobione'];
 const PROPS = PropertiesService.getScriptProperties();
@@ -190,11 +192,11 @@ function auth(b) {
 }
 
 function firstAdmin(b) {
-  if (read('users').length) throw new Error('Konto kierownika już istnieje — zaloguj się');
+  if (read('users').length) throw new Error('Pierwsze konto już istnieje — zaloguj się');
   const name = clean(b.name, 40);
   if (!name) throw new Error('Wpisz imię');
   checkPinFormat(b.pin);
-  const u = { id: uid('u'), name: name, role: 'Kierownik', active: true, created: new Date() };
+  const u = { id: uid('u'), name: name, role: 'Użytkownik', active: true, created: new Date() };
   u.pin = hashPin(String(b.pin), u.id);
   ensureAll();
   append('users', u);
@@ -299,7 +301,6 @@ function setStatus(b, me) {
 
 function deleteTask(b, me) {
   const o = find('tasks', b.id);
-  if (String(me.role) !== 'Kierownik' && norm(o.by) !== norm(me.name)) throw new Error('Zadanie może usunąć tylko autor albo kierownik');
   const photos = read('photos', 3).filter(p => p.task === o.id);
   photos.forEach(p => { try { DriveApp.getFileById(String(p.file)).setTrashed(true); } catch (e) {} });
   removeRows('photos', photos);
@@ -488,7 +489,6 @@ function addPhoto(b, me) {
 
 function deletePhoto(b, me) {
   const p = find('photos', b.id);
-  if (String(me.role) !== 'Kierownik' && norm(p.by) !== norm(me.name)) throw new Error('Zdjęcie może usunąć tylko autor albo kierownik');
   try { DriveApp.getFileById(String(p.file)).setTrashed(true); } catch (e) {}
   removeRows('photos', [p]);
   return { ok: true };
@@ -513,24 +513,18 @@ function changePin(b, me) {
   return { ok: true };
 }
 
-function mustBeBoss(me) {
-  if (String(me.role) !== 'Kierownik') throw new Error('Tylko kierownik może zarządzać osobami');
-}
-
 function addUser(b, me) {
-  mustBeBoss(me);
   const name = clean(b.name, 40);
   if (!name) throw new Error('Wpisz imię');
   checkPinFormat(b.pin);
   if (read('users').some(u => norm(u.name) === norm(name))) throw new Error('Osoba „' + name + '” już jest na liście');
-  const u = { id: uid('u'), name: name, role: b.role === 'Kierownik' ? 'Kierownik' : 'Pracownik', active: true, created: new Date() };
+  const u = { id: uid('u'), name: name, role: 'Użytkownik', active: true, created: new Date() };
   u.pin = hashPin(String(b.pin), u.id);
   append('users', u);
   return { ok: true, user: pubUser(u) };
 }
 
 function updateUser(b, me) {
-  mustBeBoss(me);
   const all = read('users'), u = all.find(x => x.id === String(b.id || ''));
   if (!u) throw new Error('Nie znaleziono osoby — odśwież aplikację');
   if (b.name !== undefined) {
@@ -539,11 +533,9 @@ function updateUser(b, me) {
     if (all.some(x => x.id !== u.id && norm(x.name) === norm(name))) throw new Error('Osoba „' + name + '” już jest na liście');
     u.name = name;
   }
-  if (b.role !== undefined) u.role = b.role === 'Kierownik' ? 'Kierownik' : 'Pracownik';
   if (b.active !== undefined) u.active = !!b.active;
   if (b.pin) { checkPinFormat(b.pin); u.pin = hashPin(String(b.pin), u.id); }
-  const bosses = all.filter(x => (x.id === u.id ? (u.role === 'Kierownik' && on(u.active)) : (String(x.role) === 'Kierownik' && on(x.active))));
-  if (!bosses.length) throw new Error('Musi zostać co najmniej jeden aktywny kierownik');
+  if (u.id === me.id && !on(u.active)) throw new Error('Nie możesz wyłączyć samego siebie');
   write('users', u);
   return { ok: true, user: pubUser(u) };
 }

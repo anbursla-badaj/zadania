@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "1";
+const APP_VER = "2";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -296,8 +296,7 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
             <div class="users" id="sUsers"></div>
             <div class="label">Dodaj osobę</div>
             <input id="uName" maxlength="40" placeholder="Imię">
-            <div class="row"><input id="uPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN startowy (4–8 cyfr)">
-              <select id="uRole" style="width:auto"><option>Pracownik</option><option>Kierownik</option></select></div>
+            <input id="uPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN startowy (4–8 cyfr)">
             <button class="btn primary" id="uAdd">Dodaj osobę</button>
             <div class="note">Imię i PIN przekaż tej osobie — PIN może potem zmienić sama w ustawieniach.</div>
           </div>
@@ -365,7 +364,7 @@ const byId=(l,id)=>l.find(x=>x.id===id);
 const uName=id=>{const u=byId(users,id);return u?u.name:""};
 const curTask=()=>byId(tasks,cur);
 const prodName=c=>{const p=mag.products.find(x=>x.code===c);return p?p.name:""};
-const isBoss=()=>me&&me.role==="Kierownik";
+const isBoss=()=>!!me;  // wszyscy mają takie same uprawnienia
 
 /* ---------- API ---------- */
 async function api(action,params={},noAuth){
@@ -382,7 +381,7 @@ function showLogin(mode,msg){loginMode=mode;me=null;
   $("#bootView").hidden=true;$("#appView").hidden=true;$("#tabs").hidden=true;$("#who").hidden=true;$("#loginView").hidden=false;
   const first=mode==="first";
   $("#lTitle").textContent=first?"Pierwsze uruchomienie":"Logowanie";
-  $("#lNote").textContent=first?"Utwórz konto kierownika. Potem w ustawieniach dodasz kolegów.":"Wpisz swoje imię i PIN. Telefon je zapamięta.";
+  $("#lNote").textContent=first?"Utwórz pierwsze konto (swoje). Potem w ustawieniach dodasz kolegów — wszyscy mają takie same uprawnienia.":"Wpisz swoje imię i PIN. Telefon je zapamięta.";
   $("#lPin2Box").hidden=!first;$("#lGo").textContent=first?"Utwórz konto":"Zaloguj";
   $("#lMsg").hidden=!msg;$("#lMsg").textContent=msg||"";
   if(cred&&cred.u)$("#lName").value=cred.u;
@@ -732,19 +731,18 @@ applyTheme();
 $("#sTheme").onclick=e=>{const b=e.target.closest("[data-th]");if(b){theme=b.dataset.th;applyTheme()}};
 let userEdit=null;
 function renderSettings(){$("#sVer").textContent=APP_VER;
-  $("#sMe").innerHTML=`<b>${esc(me.name)}</b> · ${esc(me.role)}`;
+  $("#sMe").innerHTML=`Zalogowany: <b>${esc(me.name)}</b>`;
   $("#sBoss").hidden=!isBoss();if(!isBoss())return;
   $("#sUsers").innerHTML=users.map(u=>`<div class="usr${u.active?"":" off"}" data-u="${esc(u.id)}">
-    <div class="nm">${esc(u.name)}<small>${esc(u.role)}${u.active?"":" · wyłączony"}${u.id===me.id?" · to Ty":""}</small></div>
+    <div class="nm">${esc(u.name)}<small>${u.active?"aktywny":"wyłączony"}${u.id===me.id?" · to Ty":""}</small></div>
     ${userEdit===u.id?`<input data-np type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN" style="width:130px"><button class="btn sm primary" data-pinsave>Zapisz</button><button class="btn sm" data-pincancel>Anuluj</button>`
-    :`<button class="btn sm" data-pin>PIN</button><button class="btn sm" data-role>${u.role==="Kierownik"?"→ Pracownik":"→ Kierownik"}</button>${u.id!==me.id?`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button>`:""}`}</div>`).join("");
+    :`<button class="btn sm" data-pin>PIN</button>${u.id!==me.id?`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button>`:""}`}</div>`).join("");
   const np=$("#sUsers [data-np]");if(np)np.focus()}
 $("#sUsers").onclick=async e=>{const row=e.target.closest("[data-u]");if(!row)return;const u=byId(users,row.dataset.u);const b=e.target.closest("button");if(!b||!u)return;
   if(b.matches("[data-pin]")){userEdit=u.id;return renderSettings()}
   if(b.matches("[data-pincancel]")){userEdit=null;return renderSettings()}
   let p=null;
   if(b.matches("[data-pinsave]")){const v=row.querySelector("[data-np]").value.trim();if(!/^\d{4,8}$/.test(v))return toast("PIN to 4–8 cyfr",true);p={id:u.id,pin:v}}
-  if(b.matches("[data-role]"))p={id:u.id,role:u.role==="Kierownik"?"Pracownik":"Kierownik"};
   if(b.matches("[data-act]"))p={id:u.id,active:!u.active};
   if(!p)return;
   await busy(b,async()=>{try{const j=await api("updateUser",p);Object.assign(u,j.user);userEdit=null;
@@ -752,7 +750,7 @@ $("#sUsers").onclick=async e=>{const row=e.target.closest("[data-u]");if(!row)re
     renderSettings();toast(p.pin?"Zmieniono PIN — przekaż go tej osobie":"Zapisano")}catch(er){toast(er.message,true)}})};
 $("#uAdd").onclick=()=>busy($("#uAdd"),async()=>{const name=$("#uName").value.trim(),pin=$("#uPin").value.trim();
   if(!name)return toast("Wpisz imię",true);if(!/^\d{4,8}$/.test(pin))return toast("PIN to 4–8 cyfr",true);
-  try{const j=await api("addUser",{name,pin,role:$("#uRole").value});users.push(j.user);$("#uName").value="";$("#uPin").value="";renderSettings();toast("Dodano: "+j.user.name)}
+  try{const j=await api("addUser",{name,pin});users.push(j.user);$("#uName").value="";$("#uPin").value="";renderSettings();toast("Dodano: "+j.user.name)}
   catch(e){toast(e.message,true)}});
 $("#sPinSave").onclick=()=>busy($("#sPinSave"),async()=>{const a=$("#sPin1").value.trim(),b=$("#sPin2").value.trim();
   if(!/^\d{4,8}$/.test(a))return toast("PIN to 4–8 cyfr",true);if(a!==b)return toast("PIN-y się różnią",true);
