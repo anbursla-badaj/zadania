@@ -2,7 +2,7 @@
  * Zadania — backend w Google Sheets (Apps Script).
  *
  * Arkusze tworzą się same przy pierwszym użyciu:
- *   Użytkownicy: ID | Imię | PIN (skrót, nie sam PIN) | Rola | Aktywny | Utworzono
+ *   Użytkownicy: ID | Imię | PIN (skrót, nie sam PIN) | Rola (Administrator / Użytkownik) | Aktywny | Utworzono
  *   Zadania:     ID | Nr | Tytuł | Opis | Status | Przypisane | Termin | Pilne | PP | Utworzył | Utworzono | Zmieniono | Zakończono
  *   Pozycje:     ID | Zadanie | Typ | Tekst | Kod | Ilość | PP | Zrobione | Kto | Kiedy | Wpis magazynu | Kolejność
  *   Zdjęcia:     ID | Zadanie | Plik | Rodzaj | Kto | Kiedy | Miniatura
@@ -16,9 +16,11 @@
  * zwykłe „Wydanie” z Dokument = „Zadanie #Nr”. Odznaczenie usuwa ten wpis po jego ID.
  * Kod magazynQR nie jest zmieniany.
  *
- * Wszyscy użytkownicy mają takie same uprawnienia (zadania, usuwanie, dodawanie osób).
+ * Uprawnienia: zadania, pozycje, zdjęcia i komentarze może dodawać, zmieniać i usuwać każdy.
+ * Każdy zmienia swoje imię i PIN. Konta innych osób (dodawanie, PIN, wyłączanie, usuwanie,
+ * nadawanie administratora) zmienia tylko administrator. Pierwsze konto jest administratorem.
  */
-const VER = '2';
+const VER = '3';
 const MAX_FAILS_NAME = 8, MAX_FAILS_ALL = 40, LOCK_MIN = 10;
 const STATUSES = ['Nowe', 'W trakcie', 'Zrobione'];
 const PROPS = PropertiesService.getScriptProperties();
@@ -79,6 +81,7 @@ function route(b) {
       case 'changePin': return changePin(b, me);
       case 'addUser': return addUser(b, me);
       case 'updateUser': return updateUser(b, me);
+      case 'deleteUser': return deleteUser(b, me);
     }
     throw new Error('Nieznana akcja — odśwież aplikację');
   });
@@ -181,7 +184,7 @@ function auth(b) {
   if (cache.get('lockAll')) throw fail('Zbyt wiele błędnych prób. Spróbuj ponownie za kilka minut.', { auth: true });
   const name = norm(b.u), pin = String(b.p || ''), key = 'f:' + Utilities.base64EncodeWebSafe(name).slice(0, 200);
   if (cache.get('lock' + key)) throw fail('Zbyt wiele błędnych prób dla tego imienia. Spróbuj za ' + LOCK_MIN + ' min.', { auth: true });
-  const u = name && read('users').find(x => norm(x.name) === name && on(x.active));
+  const u = name && usersFixed().find(x => norm(x.name) === name && on(x.active));
   if (u && pin && String(u.pin) === hashPin(pin, u.id)) return u;
   Utilities.sleep(1500);
   const fn = (Number(cache.get(key)) || 0) + 1, fa = (Number(cache.get('failsAll')) || 0) + 1;
@@ -196,7 +199,7 @@ function firstAdmin(b) {
   const name = clean(b.name, 40);
   if (!name) throw new Error('Wpisz imię');
   checkPinFormat(b.pin);
-  const u = { id: uid('u'), name: name, role: 'Użytkownik', active: true, created: new Date() };
+  const u = { id: uid('u'), name: name, role: 'Administrator', active: true, created: new Date() };
   u.pin = hashPin(String(b.pin), u.id);
   ensureAll();
   append('users', u);
@@ -513,12 +516,28 @@ function changePin(b, me) {
   return { ok: true };
 }
 
+function isAdmin(u) { return String(u.role) === 'Administrator'; }
+function mustBeAdmin(me) {
+  if (!isAdmin(me)) throw new Error('To może zrobić tylko administrator');
+}
+
+// gdyby nie było żadnego aktywnego administratora, zostaje nim pierwsza aktywna osoba
+function usersFixed() {
+  const all = read('users');
+  if (all.length && !all.some(x => isAdmin(x) && on(x.active))) {
+    const first = all.find(x => on(x.active));
+    if (first) { first.role = 'Administrator'; write('users', first); }
+  }
+  return all;
+}
+
 function addUser(b, me) {
+  mustBeAdmin(me);
   const name = clean(b.name, 40);
   if (!name) throw new Error('Wpisz imię');
   checkPinFormat(b.pin);
   if (read('users').some(u => norm(u.name) === norm(name))) throw new Error('Osoba „' + name + '” już jest na liście');
-  const u = { id: uid('u'), name: name, role: 'Użytkownik', active: true, created: new Date() };
+  const u = { id: uid('u'), name: name, role: b.admin ? 'Administrator' : 'Użytkownik', active: true, created: new Date() };
   u.pin = hashPin(String(b.pin), u.id);
   append('users', u);
   return { ok: true, user: pubUser(u) };
@@ -527,17 +546,39 @@ function addUser(b, me) {
 function updateUser(b, me) {
   const all = read('users'), u = all.find(x => x.id === String(b.id || ''));
   if (!u) throw new Error('Nie znaleziono osoby — odśwież aplikację');
+  const self = u.id === me.id, admin = isAdmin(me);
+  if (!self && !admin) throw new Error('Konta innych osób może zmieniać tylko administrator');
   if (b.name !== undefined) {
+    if (!self) throw new Error('Imię może zmienić tylko ta osoba');
     const name = clean(b.name, 40);
     if (!name) throw new Error('Wpisz imię');
     if (all.some(x => x.id !== u.id && norm(x.name) === norm(name))) throw new Error('Osoba „' + name + '” już jest na liście');
     u.name = name;
   }
-  if (b.active !== undefined) u.active = !!b.active;
   if (b.pin) { checkPinFormat(b.pin); u.pin = hashPin(String(b.pin), u.id); }
-  if (u.id === me.id && !on(u.active)) throw new Error('Nie możesz wyłączyć samego siebie');
+  if (b.active !== undefined) {
+    if (!admin) throw new Error('To może zrobić tylko administrator');
+    if (self) throw new Error('Nie możesz wyłączyć samego siebie');
+    u.active = !!b.active;
+  }
+  if (b.admin !== undefined) {
+    if (!admin) throw new Error('To może zrobić tylko administrator');
+    u.role = b.admin ? 'Administrator' : 'Użytkownik';
+  }
+  if (!all.map(x => x.id === u.id ? u : x).some(x => isAdmin(x) && on(x.active)))
+    throw new Error('Musi zostać co najmniej jeden aktywny administrator');
   write('users', u);
   return { ok: true, user: pubUser(u) };
+}
+
+function deleteUser(b, me) {
+  mustBeAdmin(me);
+  const u = find('users', b.id);
+  if (u.id === me.id) throw new Error('Nie możesz usunąć samego siebie');
+  // zadania tej osoby zostają, tylko są teraz „dla wszystkich”
+  read('tasks').filter(t => String(t.assignee) === u.id).forEach(t => { t.assignee = ''; write('tasks', t); });
+  removeRows('users', [find('users', u.id)]);
+  return { ok: true };
 }
 
 /* Do ręcznego uruchomienia w edytorze (opcjonalnie): tworzy wszystkie zakładki. */

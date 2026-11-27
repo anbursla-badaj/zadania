@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <script>
 /* Wersja aplikacji — przy każdej zmianie podnieś ją razem z CACHE w sw.js. */
-const APP_VER = "2";
+const APP_VER = "3";
 /* ====== USTAWIENIA ====== */
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWiTfDNK5m_Jd6GIONDZTjNj7K7La6FkXbETOHU1IB8cv8dgJFzz_49hYqMYh3teGVjg/exec";  // adres aplikacji internetowej z Apps Script (kończy się na /exec)
 /* ======================== */
@@ -283,6 +283,8 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
         <h2>Twoje konto</h2>
         <div class="panel">
           <div id="sMe"></div>
+          <div class="label">Zmień imię</div>
+          <div class="row"><input id="sName" maxlength="40"><button class="btn" id="sNameSave">Zapisz</button></div>
           <div class="label">Zmień PIN</div>
           <div class="row"><input id="sPin1" type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN"><input id="sPin2" type="password" inputmode="numeric" maxlength="8" placeholder="Powtórz"></div>
           <button class="btn" id="sPinSave">Zapisz nowy PIN</button>
@@ -294,11 +296,15 @@ input[type=checkbox]{width:22px;height:22px;padding:0;accent-color:var(--accent)
           <h2>Osoby</h2>
           <div class="panel">
             <div class="users" id="sUsers"></div>
-            <div class="label">Dodaj osobę</div>
-            <input id="uName" maxlength="40" placeholder="Imię">
-            <input id="uPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN startowy (4–8 cyfr)">
-            <button class="btn primary" id="uAdd">Dodaj osobę</button>
-            <div class="note">Imię i PIN przekaż tej osobie — PIN może potem zmienić sama w ustawieniach.</div>
+            <div class="note" id="sNoAdmin">Konta innych osób może zmieniać administrator.</div>
+            <div id="sAddBox" class="field">
+              <div class="label">Dodaj osobę</div>
+              <input id="uName" maxlength="40" placeholder="Imię">
+              <input id="uPin" type="password" inputmode="numeric" maxlength="8" placeholder="PIN startowy (4–8 cyfr)">
+              <label class="row"><input type="checkbox" id="uAdmin"> <span>Administrator</span></label>
+              <button class="btn primary" id="uAdd">Dodaj osobę</button>
+              <div class="note">Imię i PIN przekaż tej osobie — PIN i imię może potem zmienić sama w ustawieniach.</div>
+            </div>
           </div>
         </div>
         <p class="note" style="margin-top:24px">Zadania · wersja <span id="sVer"></span></p>
@@ -364,7 +370,8 @@ const byId=(l,id)=>l.find(x=>x.id===id);
 const uName=id=>{const u=byId(users,id);return u?u.name:""};
 const curTask=()=>byId(tasks,cur);
 const prodName=c=>{const p=mag.products.find(x=>x.code===c);return p?p.name:""};
-const isBoss=()=>!!me;  // wszyscy mają takie same uprawnienia
+const isBoss=()=>!!me;  // zadania i zdjęcia może usuwać każdy
+const isAdmin=()=>!!me&&me.role==="Administrator";  // konta innych osób — tylko administrator
 
 /* ---------- API ---------- */
 async function api(action,params={},noAuth){
@@ -381,7 +388,7 @@ function showLogin(mode,msg){loginMode=mode;me=null;
   $("#bootView").hidden=true;$("#appView").hidden=true;$("#tabs").hidden=true;$("#who").hidden=true;$("#loginView").hidden=false;
   const first=mode==="first";
   $("#lTitle").textContent=first?"Pierwsze uruchomienie":"Logowanie";
-  $("#lNote").textContent=first?"Utwórz pierwsze konto (swoje). Potem w ustawieniach dodasz kolegów — wszyscy mają takie same uprawnienia.":"Wpisz swoje imię i PIN. Telefon je zapamięta.";
+  $("#lNote").textContent=first?"Utwórz pierwsze konto (swoje) — będziesz administratorem. Potem w ustawieniach dodasz kolegów.":"Wpisz swoje imię i PIN. Telefon je zapamięta.";
   $("#lPin2Box").hidden=!first;$("#lGo").textContent=first?"Utwórz konto":"Zaloguj";
   $("#lMsg").hidden=!msg;$("#lMsg").textContent=msg||"";
   if(cred&&cred.u)$("#lName").value=cred.u;
@@ -415,7 +422,7 @@ async function sync(){const j=await api("sync",{all:showAll});
   renderList();
   if(cur&&!curTask()){cur=null;if(side==="task")showSide("")}
   if(side==="task"&&cur){renderTask(true);if(det[cur]&&((pCount[cur]||0)!==(oldP[cur]||0)||(cCount[cur]||0)!==(oldC[cur]||0)))loadDetail(cur)}
-  if(side==="set"&&!userEdit)renderSettings()}
+  if(side==="set"&&!userEdit&&!userDel)renderSettings()}
 async function loadMag(force){if(!magOn&&!force)return;if(!force&&Date.now()-magAt<60000)return;
   try{const j=await api("magazyn");mag=j;magAt=Date.now();if(side==="task"&&!itemEdit)renderItems();if(!$("#pick").hidden&&pickOpen===null)renderPick()}catch(e){}}
 let pollT=0;
@@ -729,28 +736,39 @@ function applyTheme(){const r=document.documentElement;theme==="auto"?delete r.d
   document.querySelectorAll("#sTheme button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.th===theme))}
 applyTheme();
 $("#sTheme").onclick=e=>{const b=e.target.closest("[data-th]");if(b){theme=b.dataset.th;applyTheme()}};
-let userEdit=null;
-function renderSettings(){$("#sVer").textContent=APP_VER;
-  $("#sMe").innerHTML=`Zalogowany: <b>${esc(me.name)}</b>`;
-  $("#sBoss").hidden=!isBoss();if(!isBoss())return;
-  $("#sUsers").innerHTML=users.map(u=>`<div class="usr${u.active?"":" off"}" data-u="${esc(u.id)}">
-    <div class="nm">${esc(u.name)}<small>${u.active?"aktywny":"wyłączony"}${u.id===me.id?" · to Ty":""}</small></div>
-    ${userEdit===u.id?`<input data-np type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN" style="width:130px"><button class="btn sm primary" data-pinsave>Zapisz</button><button class="btn sm" data-pincancel>Anuluj</button>`
-    :`<button class="btn sm" data-pin>PIN</button>${u.id!==me.id?`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button>`:""}`}</div>`).join("");
+let userEdit=null,userDel=null;
+function renderSettings(){$("#sVer").textContent=APP_VER;const adm=isAdmin();
+  $("#sMe").innerHTML=`Zalogowany: <b>${esc(me.name)}</b>${adm?" · administrator":""}`;
+  if(document.activeElement!==$("#sName"))$("#sName").value=me.name;
+  $("#sBoss").hidden=false;$("#sAddBox").hidden=!adm;$("#sNoAdmin").hidden=adm;
+  $("#sUsers").innerHTML=users.map(u=>{const self=u.id===me.id,ua=u.role==="Administrator";let acts="";
+    if(userEdit===u.id)acts=`<input data-np type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN" style="width:130px"><button class="btn sm primary" data-pinsave>Zapisz</button><button class="btn sm" data-cancel>Anuluj</button>`;
+    else if(userDel===u.id)acts=`<span class="note" style="flex-basis:100%">Usunąć konto „${esc(u.name)}”? Zadania przypisane do tej osoby będą „dla wszystkich”.</span><button class="btn sm danger" data-delyes>Usuń konto</button><button class="btn sm" data-cancel>Anuluj</button>`;
+    else if(adm)acts=`<button class="btn sm" data-pin>PIN</button><button class="btn sm" data-adm>${ua?"Odbierz admina":"Nadaj admina"}</button>${self?"":`<button class="btn sm" data-act>${u.active?"Wyłącz":"Włącz"}</button><button class="btn sm danger" data-del>Usuń</button>`}`;
+    return`<div class="usr${u.active?"":" off"}" data-u="${esc(u.id)}"><div class="nm">${esc(u.name)}<small>${ua?"administrator":"użytkownik"}${u.active?"":" · wyłączony"}${self?" · to Ty":""}</small></div>${acts}</div>`}).join("");
   const np=$("#sUsers [data-np]");if(np)np.focus()}
 $("#sUsers").onclick=async e=>{const row=e.target.closest("[data-u]");if(!row)return;const u=byId(users,row.dataset.u);const b=e.target.closest("button");if(!b||!u)return;
-  if(b.matches("[data-pin]")){userEdit=u.id;return renderSettings()}
-  if(b.matches("[data-pincancel]")){userEdit=null;return renderSettings()}
+  if(b.matches("[data-pin]")){userEdit=u.id;userDel=null;return renderSettings()}
+  if(b.matches("[data-del]")){userDel=u.id;userEdit=null;return renderSettings()}
+  if(b.matches("[data-cancel]")){userEdit=userDel=null;return renderSettings()}
+  if(b.matches("[data-delyes]"))return busy(b,async()=>{try{await api("deleteUser",{id:u.id});users=users.filter(x=>x.id!==u.id);
+    tasks.forEach(t=>{if(t.assignee===u.id)t.assignee=""});userDel=null;renderSettings();renderList();toast("Usunięto konto: "+u.name)}catch(er){toast(er.message,true)}});
   let p=null;
   if(b.matches("[data-pinsave]")){const v=row.querySelector("[data-np]").value.trim();if(!/^\d{4,8}$/.test(v))return toast("PIN to 4–8 cyfr",true);p={id:u.id,pin:v}}
+  if(b.matches("[data-adm]"))p={id:u.id,admin:u.role!=="Administrator"};
   if(b.matches("[data-act]"))p={id:u.id,active:!u.active};
   if(!p)return;
   await busy(b,async()=>{try{const j=await api("updateUser",p);Object.assign(u,j.user);userEdit=null;
-    if(u.id===me.id){me.role=u.role}if(p.pin&&u.id===me.id){cred.p=p.pin;ls.set("zad_cred",JSON.stringify(cred))}
-    renderSettings();toast(p.pin?"Zmieniono PIN — przekaż go tej osobie":"Zapisano")}catch(er){toast(er.message,true)}})};
+    if(u.id===me.id)me.role=u.role;if(p.pin&&u.id===me.id){cred.p=p.pin;ls.set("zad_cred",JSON.stringify(cred))}
+    renderSettings();toast(p.pin?(u.id===me.id?"Zmieniono PIN":"Zmieniono PIN — przekaż go tej osobie"):"Zapisano")}catch(er){toast(er.message,true)}})};
+$("#sNameSave").onclick=()=>busy($("#sNameSave"),async()=>{const v=$("#sName").value.trim();if(!v)return toast("Wpisz imię",true);if(v===me.name)return;
+  try{const j=await api("updateUser",{id:me.id,name:v});me.name=j.user.name;const u=byId(users,me.id);if(u)u.name=j.user.name;
+    cred.u=j.user.name;ls.set("zad_cred",JSON.stringify(cred));$("#who").textContent=me.name+" ⚙";$("#sName").blur();renderSettings();renderList();
+    toast("Zmieniono imię — loguj się teraz jako „"+me.name+"”")}catch(e){toast(e.message,true)}});
+$("#sName").onkeydown=e=>{if(e.key==="Enter")$("#sNameSave").click()};
 $("#uAdd").onclick=()=>busy($("#uAdd"),async()=>{const name=$("#uName").value.trim(),pin=$("#uPin").value.trim();
   if(!name)return toast("Wpisz imię",true);if(!/^\d{4,8}$/.test(pin))return toast("PIN to 4–8 cyfr",true);
-  try{const j=await api("addUser",{name,pin});users.push(j.user);$("#uName").value="";$("#uPin").value="";renderSettings();toast("Dodano: "+j.user.name)}
+  try{const j=await api("addUser",{name,pin,admin:$("#uAdmin").checked});users.push(j.user);$("#uName").value="";$("#uPin").value="";$("#uAdmin").checked=false;renderSettings();toast("Dodano: "+j.user.name)}
   catch(e){toast(e.message,true)}});
 $("#sPinSave").onclick=()=>busy($("#sPinSave"),async()=>{const a=$("#sPin1").value.trim(),b=$("#sPin2").value.trim();
   if(!/^\d{4,8}$/.test(a))return toast("PIN to 4–8 cyfr",true);if(a!==b)return toast("PIN-y się różnią",true);
